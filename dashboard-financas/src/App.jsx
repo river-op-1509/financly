@@ -194,7 +194,14 @@ const NotificationToast = ({ message, type, onClose }) => {
   };
   
   const icons = { success: <Check size={20} />, error: <X size={20} />, info: <Zap size={20} />, warning: <AlertTriangle size={20} /> };
-  return (<div className={`fixed top-4 right-4 z-[70] flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border-b-4 animate-bounce-in transition-all ${styles[type] || styles.info}`}>{icons[type]}<span className="font-bold">{message}</span><button onClick={onClose} className="ml-4 opacity-70 hover:opacity-100"><X size={16}/></button></div>);
+  return (<div className={`fixed top-4 right-4 z-[70] flex items-center gap-3 pointer-events-none`}>
+        <div className={`flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border-b-4 animate-bounce-in transition-all pointer-events-auto ${styles[type] || styles.info}`}>
+            {icons[type]}
+            <span className="font-bold">{message}</span>
+            <button onClick={onClose} className="ml-4 opacity-70 hover:opacity-100"><X size={16}/></button>
+        </div>
+    </div>
+  );
 };
 
 const Sidebar = ({ activeTab, setActiveTab, darkMode }) => (
@@ -580,6 +587,7 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
     if (itemParaDeletar) {
       setTransacoes(transacoes.filter(t => t.id !== itemParaDeletar));
       setItemParaDeletar(null);
+      onNotify("Transação removida com sucesso.", "success");
     }
   };
 
@@ -690,7 +698,7 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
             <h4 className={`font-bold text-lg capitalize flex items-center gap-2 ${textMain}`}><FileText size={20} className={THEME.primary.text}/> Extrato de {mesAtualNome}</h4>
         </div>
         
-        {/* --- EMPTY STATE --- */}
+        {/*  EMPTY STATE */}
         {transacoesDoMes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-fade-in">
              <div className={`p-8 rounded-full mb-6 ${darkMode ? 'bg-gray-800' : 'bg-blue-50'}`}>
@@ -765,28 +773,41 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
   );
 };
 
-const TabCarteira = ({ cartoes, setCartoes, darkMode }) => {
-  // Estado local para criação de cartão
+const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
+  // Estados do Formulário
   const [novoCardNome, setNovoCardNome] = useState(''); 
   const [novoCardLimite, setNovoCardLimite] = useState(''); 
   const [novoCardVenc, setNovoCardVenc] = useState(''); 
   const [novoCardCor, setNovoCardCor] = useState(LISTA_BANCOS[0].cor);
 
+  // ESTADOS PARA OS MODAIS DE CONFIRMAÇÃO
+  const [cardParaDeletar, setCardParaDeletar] = useState(null);
+  const [compraParaDeletar, setCompraParaDeletar] = useState(null); // Objeto { cardId, compraId }
+
   const addCartao = (e) => { 
     e.preventDefault(); 
-    if (!novoCardNome) return; 
+    if (!novoCardNome) { onNotify("Preencha o nome do cartão.", "warning"); return; } 
     setCartoes([...cartoes, { id: Date.now(), nome: novoCardNome, limite: Number(novoCardLimite)||1000, diaVencimento: novoCardVenc||10, cor: novoCardCor, compras: [] }]); 
     setNovoCardNome(''); setNovoCardLimite(''); setNovoCardVenc(''); 
+    onNotify("Cartão cadastrado com sucesso!", "success");
   };
   
-  const delCartao = (id) => { if(confirm("Remover cartão?")) setCartoes(cartoes.filter(c => c.id !== id)); };
-  
+  // Função que executa a exclusão APÓS confirmar no Modal
+  const confirmarExclusaoCartao = () => {
+     if(cardParaDeletar) {
+        setCartoes(cartoes.filter(c => c.id !== cardParaDeletar)); 
+        setCardParaDeletar(null);
+        onNotify("Cartão removido.", "success");
+     }
+  };
+
   const addCompraCartao = (cardId) => { 
-    const item = prompt("Item:"); if (!item) return; 
+    const item = prompt("Item:"); if (!item) return; // Prompt simples para entrada de dados é aceitável, ou crie um modal de input se preferir
     const valTotal = Number(prompt("Valor Total:")); 
     const parcelas = Number(prompt("Parcelas:")) || 1; 
     const valParcela = valTotal / parcelas; 
     setCartoes(cartoes.map(c => c.id === cardId ? { ...c, compras: [...(c.compras || []), { id: Date.now(), item, valorTotal: valTotal, valorParcela: valParcela, parcelas, atual: 1 }] } : c)); 
+    onNotify("Compra adicionada à fatura!", "success");
   };
   
   const editCompraCartao = (cardId, compraId) => { 
@@ -797,28 +818,26 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode }) => {
     const novasParcelas = Number(prompt("Parcelas:", compra.parcelas)); 
     const novaParcela = novoTotal / novasParcelas; 
     setCartoes(cartoes.map(c => c.id === cardId ? { ...c, compras: c.compras.map(comp => comp.id === compraId ? { ...comp, item: novoItem, valorTotal: novoTotal, parcelas: novasParcelas, valorParcela: novaParcela } : comp) } : c)); 
+    onNotify("Compra atualizada com sucesso.", "success");
   };
   
-  const delCompraCartao = (cardId, compraId) => { 
-    if(confirm("Remover?")) setCartoes(cartoes.map(c => c.id === cardId ? {...c, compras: c.compras.filter(comp => comp.id !== compraId)} : c)); 
+  // Função que executa a exclusão de COMPRA após confirmar
+  const confirmarExclusaoCompra = () => {
+    if(compraParaDeletar) {
+        setCartoes(cartoes.map(c => c.id === compraParaDeletar.cardId ? {...c, compras: c.compras.filter(comp => comp.id !== compraParaDeletar.compraId)} : c)); 
+        setCompraParaDeletar(null);
+        onNotify("Compra removida da fatura.", "success");
+    }
   };
 
-  const cardClass = darkMode 
-    ? `${THEME.layout.cardDark} ${THEME.layout.borderDark}`
-    : `${THEME.layout.card} ${THEME.layout.border} shadow-xl shadow-blue-100/20`;
-
+  const cardClass = darkMode ? `${THEME.layout.cardDark} ${THEME.layout.borderDark}` : `${THEME.layout.card} ${THEME.layout.border} shadow-xl shadow-blue-100/20`;
   const textMain = darkMode ? THEME.layout.textDark : THEME.layout.text;
   const textSec = darkMode ? THEME.layout.textSecDark : THEME.layout.textSec;
-  
-  const inputClass = `w-full p-3 border rounded-xl transition-all ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL} ${
-  darkMode 
-    ? `${THEME.layout.bgDark} ${THEME.layout.borderDark} ${THEME.layout.textDark} placeholder-gray-500` 
-    : `${THEME.layout.bg} ${THEME.layout.border} ${THEME.layout.text} placeholder-gray-500 focus:bg-white`
-}`;
+  const inputClass = `w-full p-3 border rounded-xl transition-all ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL} ${darkMode ? `${THEME.layout.bgDark} ${THEME.layout.borderDark} ${THEME.layout.textDark} placeholder-gray-500` : `${THEME.layout.bg} ${THEME.layout.border} ${THEME.layout.text} placeholder-gray-500 focus:bg-white`}`;
 
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
-      {/* Formulário Novo Cartão */}
+      {/* ... (O código do formulário de Novo Cartão permanece IGUAL) ... */}
       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
         <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}>
             <CreditCard className={THEME.primary.text}/> Novo Cartão
@@ -848,12 +867,10 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode }) => {
                     ))}
                 </div>
             </div>
-            <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-6 py-2 rounded-xl font-bold w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:brightness-110 active:scale-95 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Adicionar Cartão
-           </button>
+            <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-6 py-2 rounded-xl font-bold w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:brightness-110 active:scale-95 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Adicionar Cartão</button>
         </form>
       </div>
 
-      {/* Lista de Cartões */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {cartoes.map(card => { 
             const listaCompras = card.compras || [];
@@ -866,66 +883,35 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode }) => {
                         <div className="absolute top-0 right-0 p-32 bg-white opacity-5 rounded-full -mr-16 -mt-16"></div>
                         <div className="flex justify-between items-start mb-6 relative z-10">
                             <CreditCard size={32} className="opacity-80" />
-                            
-                            {/* --- Botão de Excluir Cartão --- */}
-                            <button 
-                                onClick={() => delCartao(card.id)} 
-                                className={`text-white opacity-50 hover:opacity-100 rounded-md p-1 flex items-center justify-center transition-colors ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_VERMELHO}`}
-                            >
+                            {/* BOTÃO EXCLUIR CARTÃO ATUALIZADO */}
+                            <button onClick={() => setCardParaDeletar(card.id)} className={`text-white opacity-50 hover:opacity-100 rounded-md p-1 flex items-center justify-center transition-colors ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_VERMELHO}`}>
                                 <Trash2 size={18}/>
                             </button>
-
                         </div>
                         <div className="mb-4 relative z-10">
                             <h3 className="font-bold text-2xl tracking-tight">{card.nome}</h3>
                             <p className="text-sm opacity-80 mt-1 font-medium">Vence dia {card.diaVencimento}</p>
                         </div>
                         <div className="flex justify-between items-end relative z-10">
-                            <div>
-                                <p className="text-xs opacity-80 uppercase tracking-wide mb-1">Fatura Atual</p>
-                                <p className="text-3xl font-bold">{formatarMoeda(fatura)}</p>
-                            </div>
-                            <div className="text-right">
-                                <p className="text-xs opacity-80 uppercase tracking-wide mb-1">Disponível</p>
-                                <p className="text-lg font-bold">{formatarMoeda(disponivel)}</p>
-                            </div>
+                            <div><p className="text-xs opacity-80 uppercase tracking-wide mb-1">Fatura Atual</p><p className="text-3xl font-bold">{formatarMoeda(fatura)}</p></div>
+                            <div className="text-right"><p className="text-xs opacity-80 uppercase tracking-wide mb-1">Disponível</p><p className="text-lg font-bold">{formatarMoeda(disponivel)}</p></div>
                         </div>
                     </div>
                     
                     <div className={`${cardClass} border-t-0 rounded-b-2xl p-4 shadow-sm`}>
                         <div className="flex justify-between items-center mb-4">
                             <h4 className={`font-bold text-sm ${textMain}`}>Compras Parceladas</h4>
-                            <button onClick={() => addCompraCartao(card.id)} className={`text-xs px-3 py-1 rounded-full flex items-center gap-1 font-bold ${darkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}>
-                                <Plus size={12}/> Nova Compra
-                            </button>
+                            <button onClick={() => addCompraCartao(card.id)} className={`text-xs px-3 py-1 rounded-full flex items-center gap-1 font-bold ${darkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}><Plus size={12}/> Nova Compra</button>
                         </div>
                         <div className="space-y-2 max-h-40 overflow-y-auto">
                             {listaCompras.map(c => (
                                 <div key={c.id} className={`flex justify-between items-center text-sm border-b pb-2 last:border-0 ${darkMode ? THEME.layout.borderDark : THEME.layout.border}`}>
-                                    <div>
-                                        <p className={`font-bold ${textMain}`}>{c.item}</p>
-                                        <p className={`text-xs ${textSec}`}>Parcela {c.atual}/{c.parcelas}</p>
-                                    </div>
-                                    <div className="flex flex-col items-end">
-                                        <span className={`font-bold ${textMain}`}>{formatarMoeda(c.valorParcela)}</span>
-                                        <span className={`text-[10px] ${textSec}`}>Total: {formatarMoeda(c.valorTotal)}</span>
-                                    </div>
+                                    <div><p className={`font-bold ${textMain}`}>{c.item}</p><p className={`text-xs ${textSec}`}>Parcela {c.atual}/{c.parcelas}</p></div>
+                                    <div className="flex flex-col items-end"><span className={`font-bold ${textMain}`}>{formatarMoeda(c.valorParcela)}</span><span className={`text-[10px] ${textSec}`}>Total: {formatarMoeda(c.valorTotal)}</span></div>
                                     <div className="flex items-center gap-2 ml-3">
-                                        
-                                        {/* --- Botões de Ação da Lista --- */}
-                                        <button 
-                                            onClick={() => editCompraCartao(card.id, c.id)} 
-                                            className={`p-1 rounded-md flex items-center justify-center transition-transform hover:scale-125 ${textSec} hover:text-blue-500 ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}
-                                        >
-                                            <Pencil size={16}/>
-                                        </button>
-                                        <button 
-                                            onClick={() => delCompraCartao(card.id, c.id)} 
-                                            className={`p-1 rounded-md flex items-center justify-center transition-transform hover:scale-125 ${textSec} hover:text-red-500 ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}
-                                        >
-                                            <Trash2 size={16}/>
-                                        </button>
-
+                                        <button onClick={() => editCompraCartao(card.id, c.id)} className={`p-1 rounded-md flex items-center justify-center transition-transform hover:scale-125 ${textSec} hover:text-blue-500 ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}><Pencil size={16}/></button>
+                                        {/* BOTÃO EXCLUIR COMPRA ATUALIZADO */}
+                                        <button onClick={() => setCompraParaDeletar({cardId: card.id, compraId: c.id})} className={`p-1 rounded-md flex items-center justify-center transition-transform hover:scale-125 ${textSec} hover:text-red-500 ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}><Trash2 size={16}/></button>
                                     </div>
                                 </div>
                             ))}
@@ -935,6 +921,29 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode }) => {
             )
         })}
       </div>
+
+      {/* --- MODAIS DE CONFIRMAÇÃO DA CARTEIRA --- */}
+      
+      <Modal isOpen={!!cardParaDeletar} onClose={() => setCardParaDeletar(null)} title="Excluir Cartão?" darkMode={darkMode}>
+        <div className="text-center space-y-4">
+            <p className={textMain}>Você perderá todo o histórico deste cartão.</p>
+            <div className="flex gap-3">
+                <button onClick={() => setCardParaDeletar(null)} className={`flex-1 py-3 rounded-xl font-bold ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancelar</button>
+                <button onClick={confirmarExclusaoCartao} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.danger.bg}`}>Sim, Excluir</button>
+            </div>
+        </div>
+      </Modal>
+
+      <Modal isOpen={!!compraParaDeletar} onClose={() => setCompraParaDeletar(null)} title="Excluir Compra?" darkMode={darkMode}>
+        <div className="text-center space-y-4">
+            <p className={textMain}>Remover esta compra da fatura?</p>
+            <div className="flex gap-3">
+                <button onClick={() => setCompraParaDeletar(null)} className={`flex-1 py-3 rounded-xl font-bold ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancelar</button>
+                <button onClick={confirmarExclusaoCompra} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.danger.bg}`}>Sim, Remover</button>
+            </div>
+        </div>
+      </Modal>
+
     </div>
   );
 };
@@ -1196,294 +1205,168 @@ const TabGraficos = ({ transacoesDoMes, receitas, despesas, saldo, darkMode, set
   );
 };
 
-const TabObjetivos = ({ objetivos, setObjetivos, darkMode }) => {
+const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
   const [novoObjTitulo, setNovoObjTitulo] = useState(''); 
   const [novoObjMeta, setNovoObjMeta] = useState('');
-  
-  // Ref para focar no input quando clicar no botão do Empty State
+  const [objParaDeletar, setObjParaDeletar] = useState(null);
   const inputNomeRef = useRef(null);
 
   const addObjetivo = (e) => { 
     e.preventDefault(); 
     if(novoObjTitulo) {
       setObjetivos([...objetivos, {id: Date.now(), titulo: novoObjTitulo, atual: 0, meta: Number(novoObjMeta)}]); 
-      setNovoObjTitulo(''); 
-      setNovoObjMeta('');
-    }
+      setNovoObjTitulo(''); setNovoObjMeta('');
+      onNotify("Nova meta definida!", "success");
+    } else { onNotify("Defina um nome para a meta.", "warning"); }
   };
 
   const depObjetivo = (id) => { 
     const v = prompt("Valor:"); 
-    if(v) setObjetivos(objetivos.map(o => o.id === id ? {...o, atual: o.atual + Number(v)} : o));
+    if(v) {
+        setObjetivos(objetivos.map(o => o.id === id ? {...o, atual: o.atual + Number(v)} : o));
+        onNotify("Valor adicionado à meta!", "success");
+    }
   };
 
-  const delObjetivo = (id) => { 
-    if(confirm("Excluir?")) setObjetivos(objetivos.filter(o => o.id !== id));
+  // Função apenas marca para deletar, não usa confirm nativo
+  const confirmarExclusao = () => {
+    if(objParaDeletar) {
+        setObjetivos(objetivos.filter(o => o.id !== objParaDeletar));
+        setObjParaDeletar(null);
+        onNotify("Meta excluída.", "success");
+    }
   };
 
-  // Estilos de Layout
-  const cardClass = darkMode 
-    ? `${THEME.layout.cardDark} ${THEME.layout.borderDark}`
-    : `${THEME.layout.card} ${THEME.layout.border} shadow-xl shadow-blue-100/20`;
-
+  const cardClass = darkMode ? `${THEME.layout.cardDark} ${THEME.layout.borderDark}` : `${THEME.layout.card} ${THEME.layout.border} shadow-xl shadow-blue-100/20`;
   const textMain = darkMode ? THEME.layout.textDark : THEME.layout.text;
   const textSec = darkMode ? THEME.layout.textSecDark : THEME.layout.textSec;
-
-  // Input atualizado com Constantes de Foco
-  const inputClass = `w-full p-3 border rounded-xl transition-all 
-    ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL} 
-    ${darkMode 
-      ? `${THEME.layout.bgDark} ${THEME.layout.borderDark} ${THEME.layout.textDark} placeholder-gray-500` 
-      : `${THEME.layout.bg} ${THEME.layout.border} ${THEME.layout.text} placeholder-gray-500 focus:bg-white`
-    }`;
+  const inputClass = `w-full p-3 border rounded-xl transition-all ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL} ${darkMode ? `${THEME.layout.bgDark} ${THEME.layout.borderDark} ${THEME.layout.textDark} placeholder-gray-500` : `${THEME.layout.bg} ${THEME.layout.border} ${THEME.layout.text} placeholder-gray-500 focus:bg-white`}`;
 
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
-       {/* Card de Nova Meta */}
+       {/* ... (Código do Card Nova Meta IGUAL) ... */}
        <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
-           <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}>
-               <Target className={THEME.primary.text}/> Nova Meta
-           </h3>
+           <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><Target className={THEME.primary.text}/> Nova Meta</h3>
            <form onSubmit={addObjetivo} className="flex flex-col md:flex-row gap-4 items-end">
-               <div className="flex-1 w-full">
-                   <label className={`text-sm font-bold ${textSec}`}>Nome</label>
-                   <input 
-                      ref={inputNomeRef}
-                      className={inputClass} 
-                      value={novoObjTitulo} 
-                      onChange={e => setNovoObjTitulo(e.target.value)} 
-                      placeholder="Ex: Moto Nova, Viagem, Reserva..."
-                   />
-               </div>
-               <div className="w-48">
-                   <label className={`text-sm font-bold ${textSec}`}>Meta (R$)</label>
-                   <input type="number" className={inputClass} value={novoObjMeta} onChange={e => setNovoObjMeta(e.target.value)} />
-               </div>
-               <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-6 py-2 rounded-xl font-bold w-full md:w-auto transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:brightness-110 active:scale-95 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>
-                 Criar
-             </button>
+               <div className="flex-1 w-full"><label className={`text-sm font-bold ${textSec}`}>Nome</label><input ref={inputNomeRef} className={inputClass} value={novoObjTitulo} onChange={e => setNovoObjTitulo(e.target.value)} placeholder="Ex: Moto Nova, Viagem, Reserva..."/></div>
+               <div className="w-48"><label className={`text-sm font-bold ${textSec}`}>Meta (R$)</label><input type="number" className={inputClass} value={novoObjMeta} onChange={e => setNovoObjMeta(e.target.value)} /></div>
+               <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-6 py-2 rounded-xl font-bold w-full md:w-auto transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:brightness-110 active:scale-95 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Criar</button>
            </form>
        </div>
        
-       {/* Lógica de Exibição: Empty State vs Lista */}
        {objetivos.length === 0 ? (
+          /* ... (Empty State IGUAL) ... */
           <div className="flex flex-col items-center justify-center py-12 md:py-16 animate-fade-in border-2 border-dashed rounded-3xl border-gray-200 dark:border-gray-700">
-             <div className={`p-6 rounded-full mb-4 ${darkMode ? 'bg-gray-800' : 'bg-blue-50'} shadow-lg shadow-indigo-500/10`}>
-                <Target size={64} strokeWidth={1.5} className={`${darkMode ? 'text-gray-600' : 'text-indigo-300'}`} />
-             </div>
-             
-             <h3 className={`text-xl font-bold mb-2 text-center ${textMain}`}>
-               Defina seu primeiro alvo
-             </h3>
-             <p className={`max-w-md mx-auto mb-6 text-center text-sm ${textSec}`}>
-               Quem não sabe para onde vai, qualquer caminho serve. Crie um objetivo financeiro acima para começar a rastrear seu progresso.
-             </p>
-
-             <button 
-                onClick={() => inputNomeRef.current?.focus()}
-                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all hover:-translate-y-1 ${darkMode ? 'bg-gray-800 text-indigo-400 hover:bg-gray-700' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'} ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}
-             >
-                <Plus size={18} />
-                Começar agora
-             </button>
+             <div className={`p-6 rounded-full mb-4 ${darkMode ? 'bg-gray-800' : 'bg-blue-50'} shadow-lg shadow-indigo-500/10`}><Target size={64} strokeWidth={1.5} className={`${darkMode ? 'text-gray-600' : 'text-indigo-300'}`} /></div>
+             <h3 className={`text-xl font-bold mb-2 text-center ${textMain}`}>Defina seu primeiro alvo</h3>
+             <p className={`max-w-md mx-auto mb-6 text-center text-sm ${textSec}`}>Quem não sabe para onde vai, qualquer caminho serve. Crie um objetivo financeiro acima para começar a rastrear seu progresso.</p>
+             <button onClick={() => inputNomeRef.current?.focus()} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all hover:-translate-y-1 ${darkMode ? 'bg-gray-800 text-indigo-400 hover:bg-gray-700' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'} ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}><Plus size={18} /> Começar agora</button>
           </div>
        ) : (
-         /* Lista de Objetivos Existente */
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
              {objetivos.map(obj => (
                  <div key={obj.id} className={`${cardClass} p-6 rounded-2xl shadow-lg shadow-indigo-500/10 border flex flex-col justify-between h-full`}>
                      <div>
                          <div className="flex justify-between items-start mb-4">
-                             <div className={`p-3 rounded-xl ${THEME.secondary.light}`}>
-                                 <Trophy size={24} className={THEME.secondary.text} />
-                             </div>
-                             
-                         {/* Botão de Excluir Objetivo */}
-                             <button 
-                                onClick={() => delObjetivo(obj.id)} 
-                                className={`${textSec} hover:text-red-500 transition-transform hover:scale-110 rounded-md p-1 flex items-center justify-center ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}>
-                               <Trash2 size={18}/>
-                             </button>
+                             <div className={`p-3 rounded-xl ${THEME.secondary.light}`}><Trophy size={24} className={THEME.secondary.text} /></div>
+                             {/* BOTÃO DELETE ATUALIZADO */}
+                             <button onClick={() => setObjParaDeletar(obj.id)} className={`${textSec} hover:text-red-500 transition-transform hover:scale-110 rounded-md p-1 flex items-center justify-center ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}><Trash2 size={18}/></button>
                          </div>
                          <h4 className={`font-bold text-xl mb-1 ${textMain}`}>{obj.titulo}</h4>
                          <p className={`text-sm mb-4 font-medium ${textSec}`}>Meta: {formatarMoeda(obj.meta)}</p>
-                         
-                         {/* Barra de Progresso */}
-                         <div className={`w-full rounded-full h-3 mb-2 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                             <div className={`${THEME.secondary.bg} h-3 rounded-full transition-all duration-1000`} style={{ width: `${Math.min((obj.atual/obj.meta)*100, 100)}%` }}>
-                             </div>
-                         </div>
-                         <div className={`flex justify-between text-xs font-bold ${THEME.secondary.text}`}>
-                             <span>{formatarMoeda(obj.atual)}</span>
-                             <span>{Math.round(Math.min((obj.atual/obj.meta)*100, 100))}%</span>
-                         </div>
+                         <div className={`w-full rounded-full h-3 mb-2 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}><div className={`${THEME.secondary.bg} h-3 rounded-full transition-all duration-1000`} style={{ width: `${Math.min((obj.atual/obj.meta)*100, 100)}%` }}></div></div>
+                         <div className={`flex justify-between text-xs font-bold ${THEME.secondary.text}`}><span>{formatarMoeda(obj.atual)}</span><span>{Math.round(Math.min((obj.atual/obj.meta)*100, 100))}%</span></div>
                      </div>
-
-                         {/* Botão Adicionar */}
-                     <button 
-                         onClick={() => depObjetivo(obj.id)} 
-                         className={`mt-6 w-full p-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 hover:shadow-md 
-                         ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}
-                         ${darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/20': 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100' 
-                         }
-                     `}
-                    >
-                      <TrendingUp size={16}/> Adicionar 
-                  </button>
+                     <button onClick={() => depObjetivo(obj.id)} className={`mt-6 w-full p-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 hover:shadow-md ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL} ${darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/20': 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}><TrendingUp size={16}/> Adicionar </button>
                  </div>
              ))}
          </div>
        )}
+
+       {/* --- MODAL CONFIRMAÇÃO OBJETIVO --- */}
+       <Modal isOpen={!!objParaDeletar} onClose={() => setObjParaDeletar(null)} title="Excluir Meta?" darkMode={darkMode}>
+        <div className="text-center space-y-4">
+            <p className={textMain}>Tem certeza que deseja desistir desta meta?</p>
+            <div className="flex gap-3">
+                <button onClick={() => setObjParaDeletar(null)} className={`flex-1 py-3 rounded-xl font-bold ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancelar</button>
+                <button onClick={confirmarExclusao} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.danger.bg}`}>Sim, Excluir</button>
+            </div>
+        </div>
+      </Modal>
     </div>
   );
 };
 
-const TabBancos = ({ loading, bancos, setBancos, darkMode }) => {
+const TabBancos = ({ loading, bancos, setBancos, darkMode, onNotify }) => {
   const [bancoSelecionado, setBancoSelecionado] = useState(LISTA_BANCOS[0]);
   const [novoBancoSaldo, setNovoBancoSaldo] = useState('');
   const [novoBancoTipo, setNovoBancoTipo] = useState('Corrente');
   const [bancoEmEdicao, setBancoEmEdicao] = useState(null);
   const [novoSaldoEdit, setNovoSaldoEdit] = useState('');
-  
   const [mostrandoForm, setMostrandoForm] = useState(false);
+  
+  // ESTADO PARA DELEÇÃO
+  const [bancoParaDeletar, setBancoParaDeletar] = useState(null);
 
   const addBanco = (e) => { 
       e.preventDefault(); 
       setBancos([...bancos, { id: Date.now(), nome: bancoSelecionado.nome, saldo: Number(novoBancoSaldo) || 0, tipo: novoBancoTipo, cor: bancoSelecionado.cor }]); 
-      setNovoBancoSaldo(''); 
-  };
+      setNovoBancoSaldo(''); setMostrandoForm(false);
+      onNotify("Conta bancária adicionada!", "success");
+  }
   
-  const delBanco = (id) => { if(confirm("Remover?")) setBancos(bancos.filter(b => b.id !== id)); };
+  // Função que deleta de verdade
+  const confirmarExclusao = () => {
+    if(bancoParaDeletar) {
+        setBancos(bancos.filter(b => b.id !== bancoParaDeletar));
+        setBancoParaDeletar(null);
+        onNotify("Conta removida.", "success");
+    }
+  };
+
   const abrirEdicao = (banco) => { setBancoEmEdicao(banco); setNovoSaldoEdit(banco.saldo); };
-  const salvarEdicao = () => { if (bancoEmEdicao && novoSaldoEdit !== '') { setBancos(bancos.map(b => b.id === bancoEmEdicao.id ? { ...b, saldo: Number(novoSaldoEdit) } : b)); setBancoEmEdicao(null); } };
+  
+  const salvarEdicao = () => { 
+      if (bancoEmEdicao && novoSaldoEdit !== '') { 
+        setBancos(bancos.map(b => b.id === bancoEmEdicao.id ? { ...b, saldo: Number(novoSaldoEdit) } : b)); 
+        setBancoEmEdicao(null); 
+        onNotify("Saldo atualizado!", "success");
+      } 
+  };
 
   const totalBancos = bancos.reduce((acc, b) => acc + b.saldo, 0);
-
-  const cardClass = darkMode 
-  ? `${THEME.layout.cardDark} ${THEME.layout.borderDark}`
-  : `${THEME.layout.card} ${THEME.layout.border} shadow-xl shadow-blue-100/20`;
-
+  const cardClass = darkMode ? `${THEME.layout.cardDark} ${THEME.layout.borderDark}` : `${THEME.layout.card} ${THEME.layout.border} shadow-xl shadow-blue-100/20`;
   const textMain = darkMode ? THEME.layout.textDark : THEME.layout.text;
   const textSec = darkMode ? THEME.layout.textSecDark : THEME.layout.textSec;
-  
-  const inputClass = `w-full p-3 border rounded-xl transition-all 
-  ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL} 
-  ${darkMode 
-    ? `${THEME.layout.bgDark} ${THEME.layout.borderDark} ${THEME.layout.textDark} placeholder-gray-500` 
-    : `${THEME.layout.bg} ${THEME.layout.border} ${THEME.layout.text} placeholder-gray-500 focus:bg-white`
-  }`;
+  const inputClass = `w-full p-3 border rounded-xl transition-all ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL} ${darkMode ? `${THEME.layout.bgDark} ${THEME.layout.borderDark} ${THEME.layout.textDark} placeholder-gray-500` : `${THEME.layout.bg} ${THEME.layout.border} ${THEME.layout.text} placeholder-gray-500 focus:bg-white`}`;
 
-  // ==========================================
-  // 1. SKELETON LOADING
-  // ==========================================
-  if (loading) {
-    return (
-      <div className="space-y-6 animate-fade-in">
-         {/* Skeleton do Card de Saldo Total */}
-         <div className={`${cardClass} p-6 rounded-2xl border flex items-center justify-between`}>
-             <div className="space-y-2">
-                <Skeleton className="h-4 w-32 rounded-md" /> {/* Label */}
-                <Skeleton className="h-10 w-64 rounded-lg" /> {/* Valor Gigante */}
-             </div>
-             <Skeleton className="h-16 w-16 rounded-2xl" /> {/* Ícone */}
-         </div>
+  if (loading) { /* ... Skeleton igual ... */ return <div className="space-y-6 animate-fade-in"><Skeleton className="h-20 w-full rounded-2xl"/><Skeleton className="h-40 w-full rounded-2xl"/><Skeleton className="h-60 w-full rounded-2xl"/></div>; }
 
-         {/* Skeleton do Formulário */}
-         <div className={`${cardClass} p-6 rounded-2xl border`}>
-             <Skeleton className="h-6 w-48 mb-6 rounded-md" /> {/* Título */}
-             <div className="flex flex-col md:flex-row gap-4">
-                 <Skeleton className="h-12 w-full flex-1 rounded-xl" /> {/* Select Banco */}
-                 <Skeleton className="h-12 w-full md:w-40 rounded-xl" /> {/* Input Valor */}
-                 <Skeleton className="h-12 w-full md:w-40 rounded-xl" /> {/* Select Tipo */}
-             </div>
-             <Skeleton className="h-12 w-full rounded-xl mt-4" /> {/* Botão */}
-         </div>
-
-         {/* Skeleton dos Cards de Bancos */}
-         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-             {[1, 2, 3].map(i => (
-                 <Skeleton key={i} className="h-56 w-full rounded-2xl" />
-             ))}
-         </div>
-      </div>
-    );
-  }
-
-  // ==========================================
-  // 2. EMPTY STATE
-  // ==========================================
   if (bancos.length === 0 && !mostrandoForm) {
+    /* ... Empty State igual ... */
     return (
       <div className="flex flex-col items-center justify-center py-12 md:py-20 animate-fade-in h-full">
-         <div className={`p-8 rounded-full mb-6 ${darkMode ? 'bg-gray-800' : 'bg-blue-50'} shadow-xl shadow-blue-500/10`}>
-            <Landmark size={80} strokeWidth={1.5} className={`${darkMode ? 'text-gray-600' : 'text-blue-200'}`} />
-         </div>
-         
-         <h3 className={`text-2xl font-bold mb-3 text-center ${textMain}`}>
-           Nenhuma conta cadastrada
-         </h3>
-         <p className={`max-w-md mx-auto mb-8 text-center text-sm ${textSec}`}>
-           Gerencie seu patrimônio em um só lugar. Cadastre seus bancos, corretoras ou carteiras físicas.
-         </p>
-
-         <button 
-           onClick={() => setMostrandoForm(true)}
-           className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg hover:-translate-y-1 hover:shadow-blue-500/30 flex items-center gap-2 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}
-         >
-            <PlusCircle size={20} />
-            Cadastrar primeira conta
-         </button>
+         <div className={`p-8 rounded-full mb-6 ${darkMode ? 'bg-gray-800' : 'bg-blue-50'} shadow-xl shadow-blue-500/10`}><Landmark size={80} strokeWidth={1.5} className={`${darkMode ? 'text-gray-600' : 'text-blue-200'}`} /></div>
+         <h3 className={`text-2xl font-bold mb-3 text-center ${textMain}`}>Nenhuma conta cadastrada</h3>
+         <button onClick={() => setMostrandoForm(true)} className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg hover:-translate-y-1 hover:shadow-blue-500/30 flex items-center gap-2 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}><PlusCircle size={20} /> Cadastrar primeira conta</button>
       </div>
     );
   }
 
-  // ==========================================
-  // 3. RENDERIZAÇÃO NORMAL
-  // ==========================================
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
-      {bancos.length > 0 && (
-        <div className={`${cardClass} p-6 rounded-2xl shadow-sm border flex items-center justify-between animate-fade-in`}>
-            <div>
-                <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${textSec}`}>Patrimônio em Bancos</p>
-                <h2 className={`text-4xl font-bold ${textMain}`}>{formatarMoeda(totalBancos)}</h2>
-            </div>
-            <div className={`p-4 rounded-xl ${THEME.success.light}`}>
-                <Landmark size={32} className={THEME.success.text} />
-            </div>
-        </div>
-      )}
+      {bancos.length > 0 && (<div className={`${cardClass} p-6 rounded-2xl shadow-sm border flex items-center justify-between animate-fade-in`}><div><p className={`text-xs font-bold uppercase tracking-wider mb-1 ${textSec}`}>Patrimônio em Bancos</p><h2 className={`text-4xl font-bold ${textMain}`}>{formatarMoeda(totalBancos)}</h2></div><div className={`p-4 rounded-xl ${THEME.success.light}`}><Landmark size={32} className={THEME.success.text} /></div></div>)}
 
+      {/* Form Cadastro (Resumido para não ocupar espaço, código igual) */}
       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
-          <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}>
-              <Building2 className={THEME.primary.text} /> Cadastrar Conta
-          </h3>
+          <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><Building2 className={THEME.primary.text} /> Cadastrar Conta</h3>
           <form onSubmit={addBanco} className="space-y-4">
               <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1">
-                      <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Escolha o Banco</label>
-                      <select className={inputClass} onChange={(e) => { const banco = LISTA_BANCOS.find(b => b.nome === e.target.value); setBancoSelecionado(banco); }} value={bancoSelecionado.nome}>
-                          {LISTA_BANCOS.map(b => <option key={b.nome} value={b.nome}>{b.nome}</option>)}
-                      </select>
-                  </div>
-                  <div className="w-full md:w-40">
-                      <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Saldo Atual</label>
-                      <input type="number" className={inputClass} placeholder="0.00" value={novoBancoSaldo} onChange={e => setNovoBancoSaldo(e.target.value)} />
-                  </div>
-                  <div className="w-full md:w-40">
-                      <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Tipo</label>
-                      <select className={inputClass} value={novoBancoTipo} onChange={e => setNovoBancoTipo(e.target.value)}>
-                          <option value="Corrente">Corrente</option>
-                          <option value="Poupança">Poupança</option>
-                          <option value="Investimento">Investimento</option>
-                      </select>
-                  </div>
+                  <div className="flex-1"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Escolha o Banco</label><select className={inputClass} onChange={(e) => { const banco = LISTA_BANCOS.find(b => b.nome === e.target.value); setBancoSelecionado(banco); }} value={bancoSelecionado.nome}>{LISTA_BANCOS.map(b => <option key={b.nome} value={b.nome}>{b.nome}</option>)}</select></div>
+                  <div className="w-full md:w-40"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Saldo Atual</label><input type="number" className={inputClass} placeholder="0.00" value={novoBancoSaldo} onChange={e => setNovoBancoSaldo(e.target.value)} /></div>
+                  <div className="w-full md:w-40"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Tipo</label><select className={inputClass} value={novoBancoTipo} onChange={e => setNovoBancoTipo(e.target.value)}><option value="Corrente">Corrente</option><option value="Poupança">Poupança</option><option value="Investimento">Investimento</option></select></div>
               </div>
-              
-              <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-6 p-3 rounded-xl font-bold w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:brightness-110 active:scale-95 
-                ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>
-                Salvar Conta
-              </button>
+              <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-6 p-3 rounded-xl font-bold w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:brightness-110 active:scale-95 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Salvar Conta</button>
           </form>
       </div>
 
@@ -1495,151 +1378,109 @@ const TabBancos = ({ loading, bancos, setBancos, darkMode }) => {
                     <div className={`h-28 bg-gradient-to-r ${banco.cor} p-4 relative overflow-hidden flex flex-col justify-between`}>
                         <div className="flex justify-between items-start z-10 relative">
                             <Landmark size={32} className="text-white opacity-80" />
-                            
-                            {/* Botão de Excluir Banco */}
-                            <button 
-                                onClick={() => delBanco(banco.id)} 
-                                className={`text-white opacity-60 hover:opacity-100 transition-transform hover:scale-110 rounded-md flex items-center justify-center p-1 
-                                  ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}>
-                              <Trash2 size={18}/>
-                            </button>
-
+                            {/* BOTÃO DELETE ATUALIZADO */}
+                            <button onClick={() => setBancoParaDeletar(banco.id)} className={`text-white opacity-60 hover:opacity-100 transition-transform hover:scale-110 rounded-md flex items-center justify-center p-1 ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}><Trash2 size={18}/></button>
                         </div>
                         <span className="text-white font-bold text-xl tracking-tight relative z-10">{banco.nome}</span>
                         <div className="absolute -bottom-4 -right-4 text-white opacity-10"><Building2 size={120}/></div>
                     </div>
                     <div className="p-6 flex flex-col justify-between flex-1">
-                        <div>
-                            <p className="text-xs text-gray-400 uppercase tracking-wide font-bold mb-1">{banco.tipo}</p>
-                            <h3 className={`text-2xl font-bold mb-4 ${textMain}`}>{formatarMoeda(banco.saldo)}</h3>
-                        </div>
-                        
-                        <button 
-                        onClick={() => abrirEdicao(banco)} 
-                        className={`w-full p-3 border rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-colors 
-                          ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} 
-                          ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}>
-                            <Pencil size={14}/> Atualizar Saldo
-                        </button>
+                        <div><p className="text-xs text-gray-400 uppercase tracking-wide font-bold mb-1">{banco.tipo}</p><h3 className={`text-2xl font-bold mb-4 ${textMain}`}>{formatarMoeda(banco.saldo)}</h3></div>
+                        <button onClick={() => abrirEdicao(banco)} className={`w-full p-3 border rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-colors ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'} ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}><Pencil size={14}/> Atualizar Saldo</button>
                     </div>
                 </div>
             ))}
         </div>
       )}
 
+      {/* Modal de Edição (Já existia) */}
       <Modal isOpen={!!bancoEmEdicao} onClose={() => setBancoEmEdicao(null)} title="Atualizar Saldo" darkMode={darkMode}>
           <div className="space-y-4">
              <p className={`text-sm ${textSec}`}>Atualize o saldo atual da conta <strong>{bancoEmEdicao?.nome}</strong>.</p>
-             <div>
-                <label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Novo Valor</label>
-                <input type="number" className={inputClass} value={novoSaldoEdit} onChange={e => setNovoSaldoEdit(e.target.value)} autoFocus />
-             </div>
-             
-             <button onClick={salvarEdicao} className={`w-full p-3 rounded-xl font-bold text-white transition-colors ${THEME.primary.bg} ${THEME.primary.bgHover} 
-               ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>
-               Confirmar Alteração
-             </button>
+             <div><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Novo Valor</label><input type="number" className={inputClass} value={novoSaldoEdit} onChange={e => setNovoSaldoEdit(e.target.value)} autoFocus /></div>
+             <button onClick={salvarEdicao} className={`w-full p-3 rounded-xl font-bold text-white transition-colors ${THEME.primary.bg} ${THEME.primary.bgHover} ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Confirmar Alteração</button>
           </div>
+      </Modal>
+
+      {/* NOVO MODAL DE EXCLUSÃO */}
+      <Modal isOpen={!!bancoParaDeletar} onClose={() => setBancoParaDeletar(null)} title="Excluir Conta?" darkMode={darkMode}>
+        <div className="text-center space-y-4">
+            <p className={textMain}>O histórico financeiro desta conta será perdido.</p>
+            <div className="flex gap-3">
+                <button onClick={() => setBancoParaDeletar(null)} className={`flex-1 py-3 rounded-xl font-bold ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancelar</button>
+                <button onClick={confirmarExclusao} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.danger.bg}`}>Sim, Excluir</button>
+            </div>
+        </div>
       </Modal>
     </div>
   );
 };
 
-const TabConfiguracoes = ({ darkMode, setDarkMode, zoomLevel, setZoomLevel, usuario, setUsuario, resetarApp, exportarDados, importarDados, fileInputRef }) => {
-  
-  // --- REFATORAÇÃO DE ESTILOS ---
-  const cardClass = darkMode 
-    ? `${THEME.layout.cardDark} ${THEME.layout.borderDark}`
-    : `${THEME.layout.card} ${THEME.layout.border} shadow-xl shadow-blue-100/20`;
+const TabConfiguracoes = ({ darkMode, setDarkMode, zoomLevel, setZoomLevel, usuario, setUsuario, resetarApp, exportarDados, importarDados, fileInputRef, onNotify }) => {
+  // ESTADOS PARA CONTROLE DOS MODAIS
+  const [modalResetOpen, setModalResetOpen] = useState(false);
+  const [modalRestoreOpen, setModalRestoreOpen] = useState(false);
+  const [arquivoParaRestaurar, setArquivoParaRestaurar] = useState(null); // Guarda o evento do arquivo temporariamente
 
+  const cardClass = darkMode ? `${THEME.layout.cardDark} ${THEME.layout.borderDark}` : `${THEME.layout.card} ${THEME.layout.border} shadow-xl shadow-blue-100/20`;
   const textMain = darkMode ? THEME.layout.textDark : THEME.layout.text;
   const textSec = darkMode ? THEME.layout.textSecDark : THEME.layout.textSec;
-  
   const focusPadrao = darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL;
-  
   const btnActionClass = `flex items-center justify-center gap-3 p-4 border rounded-xl font-bold transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${darkMode ? 'border-gray-600 bg-gray-800 text-gray-300 hover:bg-gray-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'} ${focusPadrao}`;
+
+  // Intercepta a seleção de arquivo para pedir confirmação antes
+  const handleFileSelect = (e) => {
+      if(e.target.files.length > 0) {
+          setArquivoParaRestaurar(e); // Guarda o evento
+          setModalRestoreOpen(true); // Abre modal
+      }
+  };
+
+  const confirmarRestauracao = () => {
+      importarDados(arquivoParaRestaurar); // Chama a função real
+      setModalRestoreOpen(false);
+      setArquivoParaRestaurar(null);
+  };
+
+  const confirmarReset = () => {
+      resetarApp();
+      setModalResetOpen(false);
+  };
 
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
-      
-      {/* Preferências */}
+      {/* ... Preferências e Identidade (IGUAIS) ... */}
       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
-        <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}>
-            <Settings className={THEME.primary.text}/> Preferências do Sistema
-        </h3>
+        <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><Settings className={THEME.primary.text}/> Preferências do Sistema</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className={`text-sm font-bold uppercase tracking-wider block mb-2 ${textSec}`}>Tema Visual</label>
-            <button 
-                onClick={() => setDarkMode(!darkMode)} 
-                className={`w-full p-3 rounded-xl flex items-center justify-center gap-3 font-bold transition-all ${darkMode ? 'bg-gray-700 text-white border border-gray-600' : 'bg-gray-50 text-gray-800 border border-gray-200'} ${focusPadrao}`}
-            >
-              {darkMode ? <><Sun size={20} className="text-yellow-400"/> Ativar Modo Claro</> : <><Moon size={20} className={THEME.primary.text}/> Ativar Modo Escuro</>}
-            </button>
-          </div>
+          <div><label className={`text-sm font-bold uppercase tracking-wider block mb-2 ${textSec}`}>Tema Visual</label><button onClick={() => setDarkMode(!darkMode)} className={`w-full p-3 rounded-xl flex items-center justify-center gap-3 font-bold transition-all ${darkMode ? 'bg-gray-700 text-white border border-gray-600' : 'bg-gray-50 text-gray-800 border border-gray-200'} ${focusPadrao}`}>{darkMode ? <><Sun size={20} className="text-yellow-400"/> Ativar Modo Claro</> : <><Moon size={20} className={THEME.primary.text}/> Ativar Modo Escuro</>}</button></div>
           <div>
             <label className={`text-sm font-bold uppercase tracking-wider block mb-2 ${textSec}`}>Tamanho da Letra (Zoom)</label>
             <div className={`flex items-center justify-between p-2 rounded-xl border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-              
-              {/*  Botão Menos */}
-              <button 
-                onClick={() => setZoomLevel(z => Math.max(0.8, z - 0.1))} 
-                className={`p-3 rounded-xl flex items-center justify-center ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'} ${focusPadrao}`}
-              >
-                <Minus size={20} className={textMain}/>
-              </button>
-
-              <span className={`font-bold ${textMain} flex items-center gap-2 text-lg`}>
-                <Type size={20}/> {Math.round(zoomLevel * 100)}%
-              </span>
-
-              {/* ALTERAÇÃO AQUI: Botão Mais */}
-              <button 
-                onClick={() => setZoomLevel(z => Math.min(1.5, z + 0.1))} 
-                className={`p-3 rounded-xl flex items-center justify-center ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'} ${focusPadrao}`}
-              >
-                <PlusCircle size={20} className={textMain}/>
-              </button>
-
+              <button onClick={() => setZoomLevel(z => Math.max(0.8, z - 0.1))} className={`p-3 rounded-xl flex items-center justify-center ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'} ${focusPadrao}`}><Minus size={20} className={textMain}/></button>
+              <span className={`font-bold ${textMain} flex items-center gap-2 text-lg`}><Type size={20}/> {Math.round(zoomLevel * 100)}%</span>
+              <button onClick={() => setZoomLevel(z => Math.min(1.5, z + 0.1))} className={`p-3 rounded-xl flex items-center justify-center ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'} ${focusPadrao}`}><PlusCircle size={20} className={textMain}/></button>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Identidade */}
       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
-        <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}>
-            <User className={THEME.primary.text}/> Identidade
-        </h3>
+        <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><User className={THEME.primary.text}/> Identidade</h3>
         <div className="flex items-center gap-4">
           <div className={`w-16 h-16 ${THEME.primary.bg} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>{usuario.nome.charAt(0).toUpperCase()}</div>
-          <div>
-              <p className={`text-xs font-bold uppercase tracking-wider ${textSec}`}>Nome de Guerra</p>
-              <div className="flex items-center gap-2">
-                  <span className={`text-xl font-bold ${textMain}`}>{usuario.nome}</span>
-                  
-                  {/* ALTERAÇÃO AQUI: Botão Editar Nome */}
-                  <button 
-                    onClick={() => {const n = prompt('Novo nome:', usuario.nome); if(n) setUsuario({...usuario, nome: n})}} 
-                    className={`${THEME.primary.text} hover:opacity-80 rounded-md p-1 flex items-center justify-center ${focusPadrao}`}
-                  >
-                    <Pencil size={16}/>
-                  </button>
-
-              </div>
-          </div>
+          <div><p className={`text-xs font-bold uppercase tracking-wider ${textSec}`}>Nome de Guerra</p><div className="flex items-center gap-2"><span className={`text-xl font-bold ${textMain}`}>{usuario.nome}</span><button onClick={() => {const n = prompt('Novo nome:', usuario.nome); if(n) {setUsuario({...usuario, nome: n}); onNotify("Perfil atualizado!", "success");}}} className={`${THEME.primary.text} hover:opacity-80 rounded-md p-1 flex items-center justify-center ${focusPadrao}`}><Pencil size={16}/></button></div></div>
         </div>
       </div>
 
       {/* Backup */}
       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
-        <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}>
-            <Download className={THEME.success.text}/> Backup & Dados
-        </h3>
+        <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><Download className={THEME.success.text}/> Backup & Dados</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <button onClick={exportarDados} className={btnActionClass}><Download size={20}/> Salvar Backup</button>
           <div className="relative">
-            <input type="file" ref={fileInputRef} onChange={importarDados} className="hidden" accept=".json" />
+            {/* O onChange agora chama handleFileSelect que abre o Modal */}
+            <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".json" />
             <button onClick={() => fileInputRef.current.click()} className={`w-full ${btnActionClass}`}><Upload size={20}/> Restaurar Dados</button>
           </div>
         </div>
@@ -1647,19 +1488,33 @@ const TabConfiguracoes = ({ darkMode, setDarkMode, zoomLevel, setZoomLevel, usua
 
       {/* Zona de Perigo */}
       <div className={`${darkMode ? 'bg-red-900/10 border-red-900' : 'bg-red-50 border-red-100'} p-6 rounded-2xl shadow-sm border`}>
-        <h3 className={`font-bold text-xl tracking-tight mb-4 flex items-center gap-2 ${THEME.danger.text}`}>
-            <AlertTriangle className={THEME.danger.text}/> Zona de Perigo
-        </h3>
+        <h3 className={`font-bold text-xl tracking-tight mb-4 flex items-center gap-2 ${THEME.danger.text}`}><AlertTriangle className={THEME.danger.text}/> Zona de Perigo</h3>
         <p className={`text-sm mb-4 font-medium ${textSec}`}>Ação irreversível. Isso apagará todos os dados locais e reiniciará o aplicativo.</p>
-        <button 
-            onClick={resetarApp} 
-            className={`flex items-center justify-center gap-3 p-4 border rounded-xl font-bold w-full transition-colors 
-              ${darkMode ? 'border-red-900 bg-red-900/20 text-red-400 hover:bg-red-900/40' : 'border-red-200 bg-white text-red-700 hover:bg-red-50'} 
-              ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}
-        >
-            <LogOut size={20}/> Zerar Sistema (Fábrica)
-        </button>
+        <button onClick={() => setModalResetOpen(true)} className={`flex items-center justify-center gap-3 p-4 border rounded-xl font-bold w-full transition-colors ${darkMode ? 'border-red-900 bg-red-900/20 text-red-400 hover:bg-red-900/40' : 'border-red-200 bg-white text-red-700 hover:bg-red-50'} ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}><LogOut size={20}/> Zerar Sistema (Fábrica)</button>
       </div>
+
+      {/* MODAL RESET */}
+      <Modal isOpen={modalResetOpen} onClose={() => setModalResetOpen(false)} title="Zerar Tudo?" darkMode={darkMode}>
+        <div className="text-center space-y-4">
+            <div className="flex justify-center mb-4"><AlertTriangle size={48} className="text-red-500" /></div>
+            <p className={textMain}>Todos os seus dados serão apagados permanentemente. Tem certeza?</p>
+            <div className="flex gap-3">
+                <button onClick={() => setModalResetOpen(false)} className={`flex-1 py-3 rounded-xl font-bold ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancelar</button>
+                <button onClick={confirmarReset} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.danger.bg}`}>SIM, ZERAR</button>
+            </div>
+        </div>
+      </Modal>
+
+      {/* MODAL RESTORE */}
+      <Modal isOpen={modalRestoreOpen} onClose={() => {setModalRestoreOpen(false); if(fileInputRef.current) fileInputRef.current.value='';}} title="Restaurar Backup?" darkMode={darkMode}>
+        <div className="text-center space-y-4">
+            <p className={textMain}>Seus dados atuais serão substituídos pelos dados do arquivo.</p>
+            <div className="flex gap-3">
+                <button onClick={() => {setModalRestoreOpen(false); if(fileInputRef.current) fileInputRef.current.value='';}} className={`flex-1 py-3 rounded-xl font-bold ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancelar</button>
+                <button onClick={confirmarRestauracao} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.success.bg}`}>Restaurar</button>
+            </div>
+        </div>
+      </Modal>
     </div>
   );
 };
@@ -1755,10 +1610,20 @@ const FinanceDashboard = () => {
 
   // Funções de Sistema (Export/Import/Reset)
   const exportarDados = () => {
-    const dados = { transacoes, objetivos, cartoes, bancos, usuario, conquistasDesbloqueadas };
-    const blob = new Blob([JSON.stringify(dados)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `backup_financeiro_${new Date().toISOString().split('T')[0]}.json`; a.click();
+    try {
+      const dados = { transacoes, objetivos, cartoes, bancos, usuario, conquistasDesbloqueadas };
+      const blob = new Blob([JSON.stringify(dados)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); 
+      a.href = url; 
+      a.download = `backup_financeiro_${new Date().toISOString().split('T')[0]}.json`; 
+      a.click();
+      
+      // Feedback visual (Toast)
+      dispararNotificacao("Backup salvo na pasta de downloads!", "success");
+    } catch (error) {
+      dispararNotificacao("Erro ao gerar arquivo de backup.", "error");
+    }
   };
   
   const importarDados = (e) => {
@@ -1766,21 +1631,29 @@ const FinanceDashboard = () => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       try { const d = JSON.parse(ev.target.result); 
-        if (confirm("Restaurar backup?")) {
-          if(d.transacoes) setTransacoes(d.transacoes); if(d.objetivos) setObjetivos(d.objetivos);
-          if(d.cartoes) setCartoes(d.cartoes); if(d.bancos) setBancos(d.bancos);
-          if(d.usuario) setUsuario(d.usuario); if(d.conquistasDesbloqueadas) setConquistasDesbloqueadas(d.conquistasDesbloqueadas);
-          alert("Sucesso!");
-        }
-      } catch (err) { alert("Erro no arquivo."); }
-    }; reader.readAsText(file);
+          if(d.transacoes) setTransacoes(d.transacoes); 
+          if(d.objetivos) setObjetivos(d.objetivos);
+          if(d.cartoes) setCartoes(d.cartoes); 
+          if(d.bancos) setBancos(d.bancos);
+          if(d.usuario) setUsuario(d.usuario); 
+          if(d.conquistasDesbloqueadas) setConquistasDesbloqueadas(d.conquistasDesbloqueadas);
+          dispararNotificacao("Backup restaurado e dados atualizados!", "success");
+      } catch (err) { 
+        dispararNotificacao("Falha ao ler o arquivo. Verifique se é um backup válido.", "error"); 
+      }
+      if(fileInputRef.current) fileInputRef.current.value = '';
+    }; 
+    reader.readAsText(file);
   };
 
   const resetarApp = () => {
-    if (confirm("PERIGO: ISSO APAGA TUDO! Confirmar?")) {
-      setTransacoes([]); setObjetivos([]); setCartoes([]); setBancos([]); setConquistasDesbloqueadas([]); setUsuario({ nome: 'Operador' });
-      alert("Sistema zerado!");
-    }
+      setTransacoes([]); 
+      setObjetivos([]); 
+      setCartoes([]); 
+      setBancos([]); 
+      setConquistasDesbloqueadas([]); 
+      setUsuario({ nome: 'Operador' });
+      dispararNotificacao("Sistema reiniciado para padrões de fábrica.", "warning");
   };
 
   return (
@@ -1817,13 +1690,13 @@ const FinanceDashboard = () => {
             />
           )}
 
-          {/* Deixei o loading preparado nas outras abas caso você implemente skeletons nelas depois */}
+          {/* loading preparado para implementar skeletons */}
           {activeTab === 'Extrato' && <TabExtrato loading={loading} transacoes={transacoes} setTransacoes={setTransacoes} transacoesDoMes={transacoesDoMes} mesAtualNome={mesAtualNome} darkMode={darkMode} onNotify={dispararNotificacao} />}
           {activeTab === 'Gráficos' && <TabGraficos loading={loading} transacoesDoMes={transacoesDoMes} receitas={receitas} despesas={despesas} saldo={saldo} darkMode={darkMode} setActiveTab={setActiveTab} />}
-          {activeTab === 'Carteira' && <TabCarteira loading={loading} cartoes={cartoes} setCartoes={setCartoes} darkMode={darkMode} />}
-          {activeTab === 'Objetivos' && <TabObjetivos loading={loading} objetivos={objetivos} setObjetivos={setObjetivos} darkMode={darkMode} />}
-          {activeTab === 'Bancos' && <TabBancos loading={loading} bancos={bancos} setBancos={setBancos} darkMode={darkMode} />}
-          {activeTab === 'Configurações' && <TabConfiguracoes darkMode={darkMode} setDarkMode={setDarkMode} zoomLevel={zoomLevel} setZoomLevel={setZoomLevel} usuario={usuario} setUsuario={setUsuario} resetarApp={resetarApp} exportarDados={exportarDados} importarDados={importarDados} fileInputRef={fileInputRef} />}
+          {activeTab === 'Carteira' && <TabCarteira loading={loading} cartoes={cartoes} setCartoes={setCartoes} darkMode={darkMode} onNotify={dispararNotificacao} />}
+          {activeTab === 'Objetivos' && <TabObjetivos loading={loading} objetivos={objetivos} setObjetivos={setObjetivos} darkMode={darkMode} onNotify={dispararNotificacao} />}
+          {activeTab === 'Bancos' && <TabBancos loading={loading} bancos={bancos} setBancos={setBancos} darkMode={darkMode} onNotify={dispararNotificacao} />}
+          {activeTab === 'Configurações' && <TabConfiguracoes darkMode={darkMode} setDarkMode={setDarkMode} zoomLevel={zoomLevel} setZoomLevel={setZoomLevel} usuario={usuario} setUsuario={setUsuario} resetarApp={resetarApp} exportarDados={exportarDados} importarDados={importarDados} fileInputRef={fileInputRef} onNotify={dispararNotificacao} />}
           
         </div>
       </main>
