@@ -194,10 +194,10 @@ const NotificationToast = ({ message, type, onClose }) => {
   };
   
   const icons = { success: <Check size={20} />, error: <X size={20} />, info: <Zap size={20} />, warning: <AlertTriangle size={20} /> };
-  return (<div className={`fixed top-4 right-4 z-[70] flex items-center gap-3 pointer-events-none`}>
+  return (
+      <div className={`fixed top-4 right-4 z-[70] flex items-center gap-3 pointer-events-none`}>
         <div className={`flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl border-b-4 animate-bounce-in transition-all pointer-events-auto ${styles[type] || styles.info}`}>
-            {icons[type]}
-            <span className="font-bold">{message}</span>
+            {icons[type]}<span className="font-bold">{message}</span>
             <button onClick={onClose} className="ml-4 opacity-70 hover:opacity-100"><X size={16}/></button>
         </div>
     </div>
@@ -364,11 +364,34 @@ const Header = ({ anoAtual, mesAtualNome, mudarAno, mudarMes, usuario, setModalP
 };
 
 const ModalPerfil = ({ isOpen, onClose, usuario, setUsuario, conquistas }) => {
+  // Estado para o modal de edição de nome
+  const [editandoNome, setEditandoNome] = useState(false);
+  const [nomeTemp, setNomeTemp] = useState('');
+
   if (!isOpen) return null;
   const xpTotal = conquistas.reduce((acc, c) => acc + c.xp, 0);
   const nivel = Math.floor(xpTotal / 200) + 1;
   const xpProximoNivel = nivel * 200;
   const progressoNivel = Math.min((xpTotal % 200) / 200 * 100, 100);
+
+  const abrirEdicao = () => { setNomeTemp(usuario.nome); setEditandoNome(true); };
+  const salvarNome = () => { if(nomeTemp) { setUsuario({...usuario, nome: nomeTemp}); setEditandoNome(false); } };
+
+  if(editandoNome) {
+      // Sub-modal simples embutido
+      return (
+        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4 animate-fade-in">
+                <h3 className="font-bold text-lg text-gray-900">Alterar Nome</h3>
+                <input className="w-full p-3 border rounded-xl text-gray-900 bg-gray-50 focus:ring-2 focus:ring-blue-600 focus:outline-none" value={nomeTemp} onChange={e => setNomeTemp(e.target.value)} autoFocus />
+                <div className="flex gap-3">
+                    <button onClick={() => setEditandoNome(false)} className="flex-1 py-3 rounded-xl font-bold bg-gray-100 text-gray-700 hover:bg-gray-200">Cancelar</button>
+                    <button onClick={salvarNome} className="flex-1 py-3 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700">Salvar</button>
+                </div>
+            </div>
+        </div>
+      );
+  }
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
@@ -380,7 +403,7 @@ const ModalPerfil = ({ isOpen, onClose, usuario, setUsuario, conquistas }) => {
         <div className="p-6 space-y-6">
           <div className="flex flex-col items-center">
             <div className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center text-white text-4xl font-bold mb-4 shadow-xl shadow-blue-200">{usuario.nome.charAt(0).toUpperCase()}</div>
-            <div className="flex items-center gap-2 mb-1"><span className="font-bold text-2xl text-gray-900">{usuario.nome}</span><button onClick={() => {const n = prompt('Nome:', usuario.nome); if(n) setUsuario({...usuario, nome: n})}} className="text-blue-600 hover:text-blue-800"><Pencil size={16}/></button></div>
+            <div className="flex items-center gap-2 mb-1"><span className="font-bold text-2xl text-gray-900">{usuario.nome}</span><button onClick={abrirEdicao} className="text-blue-600 hover:text-blue-800"><Pencil size={16}/></button></div>
             <span className="px-4 py-1.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full uppercase tracking-wider">Nível {nivel}</span>
           </div>
           <div><div className="flex justify-between text-xs mb-1 font-bold text-gray-500 uppercase tracking-wide"><span>XP: {xpTotal}</span><span>Próx: {xpProximoNivel}</span></div><div className="w-full bg-gray-100 rounded-full h-4 overflow-hidden"><div className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full transition-all duration-1000" style={{ width: `${progressoNivel}%` }}></div></div></div>
@@ -774,16 +797,22 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
 };
 
 const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
-  // Estados do Formulário
+  // Estados do Formulário Novo Cartão
   const [novoCardNome, setNovoCardNome] = useState(''); 
   const [novoCardLimite, setNovoCardLimite] = useState(''); 
   const [novoCardVenc, setNovoCardVenc] = useState(''); 
   const [novoCardCor, setNovoCardCor] = useState(LISTA_BANCOS[0].cor);
 
-  // ESTADOS PARA OS MODAIS DE CONFIRMAÇÃO
+  // Estados para Modais de Ação
   const [cardParaDeletar, setCardParaDeletar] = useState(null);
-  const [compraParaDeletar, setCompraParaDeletar] = useState(null); // Objeto { cardId, compraId }
+  const [compraParaDeletar, setCompraParaDeletar] = useState(null);
+  
+  // Estados para Adicionar/Editar Compra (Substitui o prompt)
+  const [modalCompraOpen, setModalCompraOpen] = useState(false);
+  const [modoEdicaoCompra, setModoEdicaoCompra] = useState(false); // false = criar, true = editar
+  const [compraAtual, setCompraAtual] = useState({ cardId: null, compraId: null, item: '', valor: '', parcelas: '1' });
 
+  // --- CRUD CARTÃO ---
   const addCartao = (e) => { 
     e.preventDefault(); 
     if (!novoCardNome) { onNotify("Preencha o nome do cartão.", "warning"); return; } 
@@ -792,7 +821,6 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
     onNotify("Cartão cadastrado com sucesso!", "success");
   };
   
-  // Função que executa a exclusão APÓS confirmar no Modal
   const confirmarExclusaoCartao = () => {
      if(cardParaDeletar) {
         setCartoes(cartoes.filter(c => c.id !== cardParaDeletar)); 
@@ -801,32 +829,49 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
      }
   };
 
-  const addCompraCartao = (cardId) => { 
-    const item = prompt("Item:"); if (!item) return; // Prompt simples para entrada de dados é aceitável, ou crie um modal de input se preferir
-    const valTotal = Number(prompt("Valor Total:")); 
-    const parcelas = Number(prompt("Parcelas:")) || 1; 
-    const valParcela = valTotal / parcelas; 
-    setCartoes(cartoes.map(c => c.id === cardId ? { ...c, compras: [...(c.compras || []), { id: Date.now(), item, valorTotal: valTotal, valorParcela: valParcela, parcelas, atual: 1 }] } : c)); 
-    onNotify("Compra adicionada à fatura!", "success");
+  // --- CRUD COMPRAS (MODAIS) ---
+  const abrirModalNovaCompra = (cardId) => {
+      setCompraAtual({ cardId, compraId: null, item: '', valor: '', parcelas: '1' });
+      setModoEdicaoCompra(false);
+      setModalCompraOpen(true);
+  };
+
+  const abrirModalEditarCompra = (cardId, compra) => {
+      setCompraAtual({ cardId, compraId: compra.id, item: compra.item, valor: compra.valorTotal, parcelas: compra.parcelas });
+      setModoEdicaoCompra(true);
+      setModalCompraOpen(true);
+  };
+
+  const salvarCompra = () => {
+      if(!compraAtual.item || !compraAtual.valor) { onNotify("Preencha descrição e valor.", "warning"); return; }
+      
+      const valTotal = Number(compraAtual.valor);
+      const parcelas = Number(compraAtual.parcelas) || 1;
+      const valParcela = valTotal / parcelas;
+
+      if (modoEdicaoCompra) {
+          // Editar
+          setCartoes(cartoes.map(c => c.id === compraAtual.cardId ? { 
+              ...c, 
+              compras: c.compras.map(comp => comp.id === compraAtual.compraId ? { ...comp, item: compraAtual.item, valorTotal: valTotal, parcelas, valorParcela: valParcela } : comp) 
+          } : c));
+          onNotify("Compra atualizada!", "success");
+      } else {
+          // Criar
+          setCartoes(cartoes.map(c => c.id === compraAtual.cardId ? { 
+              ...c, 
+              compras: [...(c.compras || []), { id: Date.now(), item: compraAtual.item, valorTotal: valTotal, valorParcela: valParcela, parcelas, atual: 1 }] 
+          } : c));
+          onNotify("Compra adicionada!", "success");
+      }
+      setModalCompraOpen(false);
   };
   
-  const editCompraCartao = (cardId, compraId) => { 
-    const cartao = cartoes.find(c => c.id === cardId); 
-    const compra = (cartao.compras || []).find(c => c.id === compraId); 
-    const novoItem = prompt("Editar nome:", compra.item); if (!novoItem) return; 
-    const novoTotal = Number(prompt("Total:", compra.valorTotal)); 
-    const novasParcelas = Number(prompt("Parcelas:", compra.parcelas)); 
-    const novaParcela = novoTotal / novasParcelas; 
-    setCartoes(cartoes.map(c => c.id === cardId ? { ...c, compras: c.compras.map(comp => comp.id === compraId ? { ...comp, item: novoItem, valorTotal: novoTotal, parcelas: novasParcelas, valorParcela: novaParcela } : comp) } : c)); 
-    onNotify("Compra atualizada com sucesso.", "success");
-  };
-  
-  // Função que executa a exclusão de COMPRA após confirmar
   const confirmarExclusaoCompra = () => {
     if(compraParaDeletar) {
         setCartoes(cartoes.map(c => c.id === compraParaDeletar.cardId ? {...c, compras: c.compras.filter(comp => comp.id !== compraParaDeletar.compraId)} : c)); 
         setCompraParaDeletar(null);
-        onNotify("Compra removida da fatura.", "success");
+        onNotify("Compra removida.", "success");
     }
   };
 
@@ -837,35 +882,18 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
 
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
-      {/* ... (O código do formulário de Novo Cartão permanece IGUAL) ... */}
+      {/* Formulário Novo Cartão (Código Igual) */}
       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
-        <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}>
-            <CreditCard className={THEME.primary.text}/> Novo Cartão
-        </h3>
+        <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><CreditCard className={THEME.primary.text}/> Novo Cartão</h3>
         <form onSubmit={addCartao} className="space-y-4">
             <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
-                    <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Nome</label>
-                    <input className={inputClass} value={novoCardNome} onChange={e => setNovoCardNome(e.target.value)} />
-                </div>
-                <div className="w-32">
-                    <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Limite Total</label>
-                    <input type="number" className={inputClass} value={novoCardLimite} onChange={e => setNovoCardLimite(e.target.value)} />
-                </div>
-                <div className="w-32">
-                    <label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Dia Venc.</label>
-                    <input type="number" className={inputClass} value={novoCardVenc} onChange={e => setNovoCardVenc(e.target.value)} />
-                </div>
+                <div className="flex-1"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Nome</label><input className={inputClass} value={novoCardNome} onChange={e => setNovoCardNome(e.target.value)} /></div>
+                <div className="w-32"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Limite Total</label><input type="number" className={inputClass} value={novoCardLimite} onChange={e => setNovoCardLimite(e.target.value)} /></div>
+                <div className="w-32"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Dia Venc.</label><input type="number" className={inputClass} value={novoCardVenc} onChange={e => setNovoCardVenc(e.target.value)} /></div>
             </div>
             <div>
                 <label className={`text-xs font-bold uppercase tracking-wider mb-2 block ${textSec}`}>Cor do Banco</label>
-                <div className="flex flex-wrap gap-2">
-                    {LISTA_BANCOS.map((banco, idx) => (
-                        <div key={idx} onClick={() => setNovoCardCor(banco.cor)} title={banco.nome} className={`w-8 h-8 rounded-full cursor-pointer bg-gradient-to-br ${banco.cor} transition-transform hover:scale-110 flex items-center justify-center shadow-sm ${novoCardCor === banco.cor ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : ''}`}>
-                            {novoCardCor === banco.cor && <Check size={14} className="text-white" />}
-                        </div>
-                    ))}
-                </div>
+                <div className="flex flex-wrap gap-2">{LISTA_BANCOS.map((banco, idx) => (<div key={idx} onClick={() => setNovoCardCor(banco.cor)} title={banco.nome} className={`w-8 h-8 rounded-full cursor-pointer bg-gradient-to-br ${banco.cor} transition-transform hover:scale-110 flex items-center justify-center shadow-sm ${novoCardCor === banco.cor ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : ''}`}>{novoCardCor === banco.cor && <Check size={14} className="text-white" />}</div>))}</div>
             </div>
             <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-6 py-2 rounded-xl font-bold w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:brightness-110 active:scale-95 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Adicionar Cartão</button>
         </form>
@@ -883,10 +911,7 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
                         <div className="absolute top-0 right-0 p-32 bg-white opacity-5 rounded-full -mr-16 -mt-16"></div>
                         <div className="flex justify-between items-start mb-6 relative z-10">
                             <CreditCard size={32} className="opacity-80" />
-                            {/* BOTÃO EXCLUIR CARTÃO ATUALIZADO */}
-                            <button onClick={() => setCardParaDeletar(card.id)} className={`text-white opacity-50 hover:opacity-100 rounded-md p-1 flex items-center justify-center transition-colors ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_VERMELHO}`}>
-                                <Trash2 size={18}/>
-                            </button>
+                            <button onClick={() => setCardParaDeletar(card.id)} className={`text-white opacity-50 hover:opacity-100 rounded-md p-1 flex items-center justify-center transition-colors ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_VERMELHO}`}><Trash2 size={18}/></button>
                         </div>
                         <div className="mb-4 relative z-10">
                             <h3 className="font-bold text-2xl tracking-tight">{card.nome}</h3>
@@ -901,16 +926,16 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
                     <div className={`${cardClass} border-t-0 rounded-b-2xl p-4 shadow-sm`}>
                         <div className="flex justify-between items-center mb-4">
                             <h4 className={`font-bold text-sm ${textMain}`}>Compras Parceladas</h4>
-                            <button onClick={() => addCompraCartao(card.id)} className={`text-xs px-3 py-1 rounded-full flex items-center gap-1 font-bold ${darkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}><Plus size={12}/> Nova Compra</button>
+                            <button onClick={() => abrirModalNovaCompra(card.id)} className={`text-xs px-3 py-1 rounded-full flex items-center gap-1 font-bold ${darkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}><Plus size={12}/> Nova Compra</button>
                         </div>
-                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {/* CORREÇÃO CSS: overflow-x-hidden e padding para evitar scrollbar horizontal */}
+                        <div className="space-y-2 max-h-40 overflow-y-auto overflow-x-hidden pr-2">
                             {listaCompras.map(c => (
                                 <div key={c.id} className={`flex justify-between items-center text-sm border-b pb-2 last:border-0 ${darkMode ? THEME.layout.borderDark : THEME.layout.border}`}>
                                     <div><p className={`font-bold ${textMain}`}>{c.item}</p><p className={`text-xs ${textSec}`}>Parcela {c.atual}/{c.parcelas}</p></div>
                                     <div className="flex flex-col items-end"><span className={`font-bold ${textMain}`}>{formatarMoeda(c.valorParcela)}</span><span className={`text-[10px] ${textSec}`}>Total: {formatarMoeda(c.valorTotal)}</span></div>
                                     <div className="flex items-center gap-2 ml-3">
-                                        <button onClick={() => editCompraCartao(card.id, c.id)} className={`p-1 rounded-md flex items-center justify-center transition-transform hover:scale-125 ${textSec} hover:text-blue-500 ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}><Pencil size={16}/></button>
-                                        {/* BOTÃO EXCLUIR COMPRA ATUALIZADO */}
+                                        <button onClick={() => abrirModalEditarCompra(card.id, c)} className={`p-1 rounded-md flex items-center justify-center transition-transform hover:scale-125 ${textSec} hover:text-blue-500 ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}><Pencil size={16}/></button>
                                         <button onClick={() => setCompraParaDeletar({cardId: card.id, compraId: c.id})} className={`p-1 rounded-md flex items-center justify-center transition-transform hover:scale-125 ${textSec} hover:text-red-500 ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}><Trash2 size={16}/></button>
                                     </div>
                                 </div>
@@ -922,8 +947,7 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
         })}
       </div>
 
-      {/* --- MODAIS DE CONFIRMAÇÃO DA CARTEIRA --- */}
-      
+      {/* MODAL DE CONFIRMAÇÃO EXCLUSÃO */}
       <Modal isOpen={!!cardParaDeletar} onClose={() => setCardParaDeletar(null)} title="Excluir Cartão?" darkMode={darkMode}>
         <div className="text-center space-y-4">
             <p className={textMain}>Você perderá todo o histórico deste cartão.</p>
@@ -942,6 +966,18 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
                 <button onClick={confirmarExclusaoCompra} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.danger.bg}`}>Sim, Remover</button>
             </div>
         </div>
+      </Modal>
+
+      {/* MODAL PARA NOVA/EDITAR COMPRA (SUBSTITUI O PROMPT) */}
+      <Modal isOpen={modalCompraOpen} onClose={() => setModalCompraOpen(false)} title={modoEdicaoCompra ? "Editar Compra" : "Nova Compra"} darkMode={darkMode}>
+          <div className="space-y-4">
+              <div><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Descrição</label><input className={inputClass} value={compraAtual.item} onChange={e => setCompraAtual({...compraAtual, item: e.target.value})} placeholder="Ex: Notebook" autoFocus /></div>
+              <div className="flex gap-4">
+                  <div className="flex-1"><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Valor Total</label><input type="number" className={inputClass} value={compraAtual.valor} onChange={e => setCompraAtual({...compraAtual, valor: e.target.value})} placeholder="0.00" /></div>
+                  <div className="w-24"><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Parcelas</label><input type="number" className={inputClass} value={compraAtual.parcelas} onChange={e => setCompraAtual({...compraAtual, parcelas: e.target.value})} placeholder="1" /></div>
+              </div>
+              <button onClick={salvarCompra} className={`w-full p-3 rounded-xl font-bold text-white transition-colors ${THEME.primary.bg} ${THEME.primary.bgHover} ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Salvar</button>
+          </div>
       </Modal>
 
     </div>
@@ -1208,7 +1244,12 @@ const TabGraficos = ({ transacoesDoMes, receitas, despesas, saldo, darkMode, set
 const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
   const [novoObjTitulo, setNovoObjTitulo] = useState(''); 
   const [novoObjMeta, setNovoObjMeta] = useState('');
+  
+  // Estados para Modais
   const [objParaDeletar, setObjParaDeletar] = useState(null);
+  const [modalDepositoOpen, setModalDepositoOpen] = useState(false);
+  const [depositoAtual, setDepositoAtual] = useState({ id: null, valor: '' });
+
   const inputNomeRef = useRef(null);
 
   const addObjetivo = (e) => { 
@@ -1220,15 +1261,19 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
     } else { onNotify("Defina um nome para a meta.", "warning"); }
   };
 
-  const depObjetivo = (id) => { 
-    const v = prompt("Valor:"); 
-    if(v) {
-        setObjetivos(objetivos.map(o => o.id === id ? {...o, atual: o.atual + Number(v)} : o));
-        onNotify("Valor adicionado à meta!", "success");
-    }
+  // Abre Modal em vez de Prompt
+  const abrirModalDeposito = (id) => {
+      setDepositoAtual({ id, valor: '' });
+      setModalDepositoOpen(true);
   };
 
-  // Função apenas marca para deletar, não usa confirm nativo
+  const confirmarDeposito = () => {
+      if(!depositoAtual.valor) return;
+      setObjetivos(objetivos.map(o => o.id === depositoAtual.id ? {...o, atual: o.atual + Number(depositoAtual.valor)} : o));
+      setModalDepositoOpen(false);
+      onNotify("Valor adicionado à meta!", "success");
+  };
+
   const confirmarExclusao = () => {
     if(objParaDeletar) {
         setObjetivos(objetivos.filter(o => o.id !== objParaDeletar));
@@ -1244,7 +1289,7 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
 
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
-       {/* ... (Código do Card Nova Meta IGUAL) ... */}
+       {/* Card Nova Meta (Mantém igual) */}
        <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
            <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><Target className={THEME.primary.text}/> Nova Meta</h3>
            <form onSubmit={addObjetivo} className="flex flex-col md:flex-row gap-4 items-end">
@@ -1255,11 +1300,10 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
        </div>
        
        {objetivos.length === 0 ? (
-          /* ... (Empty State IGUAL) ... */
           <div className="flex flex-col items-center justify-center py-12 md:py-16 animate-fade-in border-2 border-dashed rounded-3xl border-gray-200 dark:border-gray-700">
              <div className={`p-6 rounded-full mb-4 ${darkMode ? 'bg-gray-800' : 'bg-blue-50'} shadow-lg shadow-indigo-500/10`}><Target size={64} strokeWidth={1.5} className={`${darkMode ? 'text-gray-600' : 'text-indigo-300'}`} /></div>
              <h3 className={`text-xl font-bold mb-2 text-center ${textMain}`}>Defina seu primeiro alvo</h3>
-             <p className={`max-w-md mx-auto mb-6 text-center text-sm ${textSec}`}>Quem não sabe para onde vai, qualquer caminho serve. Crie um objetivo financeiro acima para começar a rastrear seu progresso.</p>
+             <p className={`max-w-md mx-auto mb-6 text-center text-sm ${textSec}`}>Quem não sabe para onde vai, qualquer caminho serve.</p>
              <button onClick={() => inputNomeRef.current?.focus()} className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold transition-all hover:-translate-y-1 ${darkMode ? 'bg-gray-800 text-indigo-400 hover:bg-gray-700' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'} ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}><Plus size={18} /> Começar agora</button>
           </div>
        ) : (
@@ -1269,7 +1313,6 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
                      <div>
                          <div className="flex justify-between items-start mb-4">
                              <div className={`p-3 rounded-xl ${THEME.secondary.light}`}><Trophy size={24} className={THEME.secondary.text} /></div>
-                             {/* BOTÃO DELETE ATUALIZADO */}
                              <button onClick={() => setObjParaDeletar(obj.id)} className={`${textSec} hover:text-red-500 transition-transform hover:scale-110 rounded-md p-1 flex items-center justify-center ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}><Trash2 size={18}/></button>
                          </div>
                          <h4 className={`font-bold text-xl mb-1 ${textMain}`}>{obj.titulo}</h4>
@@ -1277,13 +1320,12 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
                          <div className={`w-full rounded-full h-3 mb-2 ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}><div className={`${THEME.secondary.bg} h-3 rounded-full transition-all duration-1000`} style={{ width: `${Math.min((obj.atual/obj.meta)*100, 100)}%` }}></div></div>
                          <div className={`flex justify-between text-xs font-bold ${THEME.secondary.text}`}><span>{formatarMoeda(obj.atual)}</span><span>{Math.round(Math.min((obj.atual/obj.meta)*100, 100))}%</span></div>
                      </div>
-                     <button onClick={() => depObjetivo(obj.id)} className={`mt-6 w-full p-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 hover:shadow-md ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL} ${darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/20': 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}><TrendingUp size={16}/> Adicionar </button>
+                     <button onClick={() => abrirModalDeposito(obj.id)} className={`mt-6 w-full p-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all active:scale-95 hover:-translate-y-1 hover:shadow-md ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL} ${darkMode ? 'bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-900/20': 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}><TrendingUp size={16}/> Adicionar </button>
                  </div>
              ))}
          </div>
        )}
 
-       {/* --- MODAL CONFIRMAÇÃO OBJETIVO --- */}
        <Modal isOpen={!!objParaDeletar} onClose={() => setObjParaDeletar(null)} title="Excluir Meta?" darkMode={darkMode}>
         <div className="text-center space-y-4">
             <p className={textMain}>Tem certeza que deseja desistir desta meta?</p>
@@ -1292,6 +1334,14 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
                 <button onClick={confirmarExclusao} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.danger.bg}`}>Sim, Excluir</button>
             </div>
         </div>
+      </Modal>
+
+      {/* MODAL ADICIONAR VALOR */}
+      <Modal isOpen={modalDepositoOpen} onClose={() => setModalDepositoOpen(false)} title="Adicionar Valor" darkMode={darkMode}>
+          <div className="space-y-4">
+              <div><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Valor a depositar</label><input type="number" className={inputClass} value={depositoAtual.valor} onChange={e => setDepositoAtual({...depositoAtual, valor: e.target.value})} autoFocus placeholder="0.00" /></div>
+              <button onClick={confirmarDeposito} className={`w-full p-3 rounded-xl font-bold text-white transition-colors ${THEME.primary.bg} ${THEME.primary.bgHover} ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Confirmar</button>
+          </div>
       </Modal>
     </div>
   );
@@ -1417,51 +1467,41 @@ const TabBancos = ({ loading, bancos, setBancos, darkMode, onNotify }) => {
 };
 
 const TabConfiguracoes = ({ darkMode, setDarkMode, zoomLevel, setZoomLevel, usuario, setUsuario, resetarApp, exportarDados, importarDados, fileInputRef, onNotify }) => {
-  // ESTADOS PARA CONTROLE DOS MODAIS
   const [modalResetOpen, setModalResetOpen] = useState(false);
   const [modalRestoreOpen, setModalRestoreOpen] = useState(false);
-  const [arquivoParaRestaurar, setArquivoParaRestaurar] = useState(null); // Guarda o evento do arquivo temporariamente
+  const [arquivoParaRestaurar, setArquivoParaRestaurar] = useState(null);
+  
+  // Estado para edição de nome
+  const [modalNomeOpen, setModalNomeOpen] = useState(false);
+  const [novoNomeUsuario, setNovoNomeUsuario] = useState('');
 
   const cardClass = darkMode ? `${THEME.layout.cardDark} ${THEME.layout.borderDark}` : `${THEME.layout.card} ${THEME.layout.border} shadow-xl shadow-blue-100/20`;
   const textMain = darkMode ? THEME.layout.textDark : THEME.layout.text;
   const textSec = darkMode ? THEME.layout.textSecDark : THEME.layout.textSec;
   const focusPadrao = darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL;
   const btnActionClass = `flex items-center justify-center gap-3 p-4 border rounded-xl font-bold transition-all duration-300 hover:-translate-y-1 hover:shadow-lg active:scale-95 ${darkMode ? 'border-gray-600 bg-gray-800 text-gray-300 hover:bg-gray-700' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'} ${focusPadrao}`;
+  const inputClass = `w-full p-3 border rounded-xl transition-all ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL} ${darkMode ? `${THEME.layout.bgDark} ${THEME.layout.borderDark} ${THEME.layout.textDark} placeholder-gray-500` : `${THEME.layout.bg} ${THEME.layout.border} ${THEME.layout.text} placeholder-gray-500 focus:bg-white`}`;
 
-  // Intercepta a seleção de arquivo para pedir confirmação antes
-  const handleFileSelect = (e) => {
-      if(e.target.files.length > 0) {
-          setArquivoParaRestaurar(e); // Guarda o evento
-          setModalRestoreOpen(true); // Abre modal
-      }
-  };
-
-  const confirmarRestauracao = () => {
-      importarDados(arquivoParaRestaurar); // Chama a função real
-      setModalRestoreOpen(false);
-      setArquivoParaRestaurar(null);
-  };
-
-  const confirmarReset = () => {
-      resetarApp();
-      setModalResetOpen(false);
+  const handleFileSelect = (e) => { if(e.target.files.length > 0) { setArquivoParaRestaurar(e); setModalRestoreOpen(true); } };
+  const confirmarRestauracao = () => { importarDados(arquivoParaRestaurar); setModalRestoreOpen(false); setArquivoParaRestaurar(null); };
+  const confirmarReset = () => { resetarApp(); setModalResetOpen(false); };
+  
+  const abrirModalNome = () => { setNovoNomeUsuario(usuario.nome); setModalNomeOpen(true); };
+  const salvarNome = () => { 
+      if(novoNomeUsuario) { 
+          setUsuario({...usuario, nome: novoNomeUsuario}); 
+          setModalNomeOpen(false); 
+          onNotify("Perfil atualizado!", "success"); 
+      } 
   };
 
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
-      {/* ... Preferências e Identidade (IGUAIS) ... */}
       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
         <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><Settings className={THEME.primary.text}/> Preferências do Sistema</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div><label className={`text-sm font-bold uppercase tracking-wider block mb-2 ${textSec}`}>Tema Visual</label><button onClick={() => setDarkMode(!darkMode)} className={`w-full p-3 rounded-xl flex items-center justify-center gap-3 font-bold transition-all ${darkMode ? 'bg-gray-700 text-white border border-gray-600' : 'bg-gray-50 text-gray-800 border border-gray-200'} ${focusPadrao}`}>{darkMode ? <><Sun size={20} className="text-yellow-400"/> Ativar Modo Claro</> : <><Moon size={20} className={THEME.primary.text}/> Ativar Modo Escuro</>}</button></div>
-          <div>
-            <label className={`text-sm font-bold uppercase tracking-wider block mb-2 ${textSec}`}>Tamanho da Letra (Zoom)</label>
-            <div className={`flex items-center justify-between p-2 rounded-xl border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-              <button onClick={() => setZoomLevel(z => Math.max(0.8, z - 0.1))} className={`p-3 rounded-xl flex items-center justify-center ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'} ${focusPadrao}`}><Minus size={20} className={textMain}/></button>
-              <span className={`font-bold ${textMain} flex items-center gap-2 text-lg`}><Type size={20}/> {Math.round(zoomLevel * 100)}%</span>
-              <button onClick={() => setZoomLevel(z => Math.min(1.5, z + 0.1))} className={`p-3 rounded-xl flex items-center justify-center ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'} ${focusPadrao}`}><PlusCircle size={20} className={textMain}/></button>
-            </div>
-          </div>
+          <div><label className={`text-sm font-bold uppercase tracking-wider block mb-2 ${textSec}`}>Tamanho da Letra (Zoom)</label><div className={`flex items-center justify-between p-2 rounded-xl border ${darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}><button onClick={() => setZoomLevel(z => Math.max(0.8, z - 0.1))} className={`p-3 rounded-xl flex items-center justify-center ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'} ${focusPadrao}`}><Minus size={20} className={textMain}/></button><span className={`font-bold ${textMain} flex items-center gap-2 text-lg`}><Type size={20}/> {Math.round(zoomLevel * 100)}%</span><button onClick={() => setZoomLevel(z => Math.min(1.5, z + 0.1))} className={`p-3 rounded-xl flex items-center justify-center ${darkMode ? 'hover:bg-gray-600' : 'hover:bg-gray-200'} ${focusPadrao}`}><PlusCircle size={20} className={textMain}/></button></div></div>
         </div>
       </div>
 
@@ -1469,51 +1509,30 @@ const TabConfiguracoes = ({ darkMode, setDarkMode, zoomLevel, setZoomLevel, usua
         <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><User className={THEME.primary.text}/> Identidade</h3>
         <div className="flex items-center gap-4">
           <div className={`w-16 h-16 ${THEME.primary.bg} rounded-full flex items-center justify-center text-white text-2xl font-bold`}>{usuario.nome.charAt(0).toUpperCase()}</div>
-          <div><p className={`text-xs font-bold uppercase tracking-wider ${textSec}`}>Nome de Guerra</p><div className="flex items-center gap-2"><span className={`text-xl font-bold ${textMain}`}>{usuario.nome}</span><button onClick={() => {const n = prompt('Novo nome:', usuario.nome); if(n) {setUsuario({...usuario, nome: n}); onNotify("Perfil atualizado!", "success");}}} className={`${THEME.primary.text} hover:opacity-80 rounded-md p-1 flex items-center justify-center ${focusPadrao}`}><Pencil size={16}/></button></div></div>
+          <div><p className={`text-xs font-bold uppercase tracking-wider ${textSec}`}>Nome de Guerra</p><div className="flex items-center gap-2"><span className={`text-xl font-bold ${textMain}`}>{usuario.nome}</span><button onClick={abrirModalNome} className={`${THEME.primary.text} hover:opacity-80 rounded-md p-1 flex items-center justify-center ${focusPadrao}`}><Pencil size={16}/></button></div></div>
         </div>
       </div>
 
-      {/* Backup */}
       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
         <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><Download className={THEME.success.text}/> Backup & Dados</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <button onClick={exportarDados} className={btnActionClass}><Download size={20}/> Salvar Backup</button>
-          <div className="relative">
-            {/* O onChange agora chama handleFileSelect que abre o Modal */}
-            <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".json" />
-            <button onClick={() => fileInputRef.current.click()} className={`w-full ${btnActionClass}`}><Upload size={20}/> Restaurar Dados</button>
-          </div>
-        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4"><button onClick={exportarDados} className={btnActionClass}><Download size={20}/> Salvar Backup</button><div className="relative"><input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".json" /><button onClick={() => fileInputRef.current.click()} className={`w-full ${btnActionClass}`}><Upload size={20}/> Restaurar Dados</button></div></div>
       </div>
 
-      {/* Zona de Perigo */}
       <div className={`${darkMode ? 'bg-red-900/10 border-red-900' : 'bg-red-50 border-red-100'} p-6 rounded-2xl shadow-sm border`}>
         <h3 className={`font-bold text-xl tracking-tight mb-4 flex items-center gap-2 ${THEME.danger.text}`}><AlertTriangle className={THEME.danger.text}/> Zona de Perigo</h3>
         <p className={`text-sm mb-4 font-medium ${textSec}`}>Ação irreversível. Isso apagará todos os dados locais e reiniciará o aplicativo.</p>
         <button onClick={() => setModalResetOpen(true)} className={`flex items-center justify-center gap-3 p-4 border rounded-xl font-bold w-full transition-colors ${darkMode ? 'border-red-900 bg-red-900/20 text-red-400 hover:bg-red-900/40' : 'border-red-200 bg-white text-red-700 hover:bg-red-50'} ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}><LogOut size={20}/> Zerar Sistema (Fábrica)</button>
       </div>
 
-      {/* MODAL RESET */}
-      <Modal isOpen={modalResetOpen} onClose={() => setModalResetOpen(false)} title="Zerar Tudo?" darkMode={darkMode}>
-        <div className="text-center space-y-4">
-            <div className="flex justify-center mb-4"><AlertTriangle size={48} className="text-red-500" /></div>
-            <p className={textMain}>Todos os seus dados serão apagados permanentemente. Tem certeza?</p>
-            <div className="flex gap-3">
-                <button onClick={() => setModalResetOpen(false)} className={`flex-1 py-3 rounded-xl font-bold ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancelar</button>
-                <button onClick={confirmarReset} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.danger.bg}`}>SIM, ZERAR</button>
-            </div>
-        </div>
-      </Modal>
-
-      {/* MODAL RESTORE */}
-      <Modal isOpen={modalRestoreOpen} onClose={() => {setModalRestoreOpen(false); if(fileInputRef.current) fileInputRef.current.value='';}} title="Restaurar Backup?" darkMode={darkMode}>
-        <div className="text-center space-y-4">
-            <p className={textMain}>Seus dados atuais serão substituídos pelos dados do arquivo.</p>
-            <div className="flex gap-3">
-                <button onClick={() => {setModalRestoreOpen(false); if(fileInputRef.current) fileInputRef.current.value='';}} className={`flex-1 py-3 rounded-xl font-bold ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancelar</button>
-                <button onClick={confirmarRestauracao} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.success.bg}`}>Restaurar</button>
-            </div>
-        </div>
+      <Modal isOpen={modalResetOpen} onClose={() => setModalResetOpen(false)} title="Zerar Tudo?" darkMode={darkMode}><div className="text-center space-y-4"><div className="flex justify-center mb-4"><AlertTriangle size={48} className="text-red-500" /></div><p className={textMain}>Todos os seus dados serão apagados permanentemente. Tem certeza?</p><div className="flex gap-3"><button onClick={() => setModalResetOpen(false)} className={`flex-1 py-3 rounded-xl font-bold ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancelar</button><button onClick={confirmarReset} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.danger.bg}`}>SIM, ZERAR</button></div></div></Modal>
+      <Modal isOpen={modalRestoreOpen} onClose={() => {setModalRestoreOpen(false); if(fileInputRef.current) fileInputRef.current.value='';}} title="Restaurar Backup?" darkMode={darkMode}><div className="text-center space-y-4"><p className={textMain}>Seus dados atuais serão substituídos pelos dados do arquivo.</p><div className="flex gap-3"><button onClick={() => {setModalRestoreOpen(false); if(fileInputRef.current) fileInputRef.current.value='';}} className={`flex-1 py-3 rounded-xl font-bold ${darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'}`}>Cancelar</button><button onClick={confirmarRestauracao} className={`flex-1 py-3 rounded-xl font-bold text-white ${THEME.success.bg}`}>Restaurar</button></div></div></Modal>
+      
+      {/* MODAL EDITAR NOME */}
+      <Modal isOpen={modalNomeOpen} onClose={() => setModalNomeOpen(false)} title="Editar Nome" darkMode={darkMode}>
+          <div className="space-y-4">
+              <div><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Novo Nome</label><input className={inputClass} value={novoNomeUsuario} onChange={e => setNovoNomeUsuario(e.target.value)} autoFocus /></div>
+              <button onClick={salvarNome} className={`w-full p-3 rounded-xl font-bold text-white transition-colors ${THEME.primary.bg} ${THEME.primary.bgHover} ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Salvar</button>
+          </div>
       </Modal>
     </div>
   );
