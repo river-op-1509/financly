@@ -712,9 +712,12 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
   const [novaDesc, setNovaDesc] = useState(''); 
   const [novoVal, setNovoVal] = useState(''); 
   const [novoTipo, setNovoTipo] = useState('saida');
-  const [novaCat, setNovaCat] = useState('Outros');
+  const [novaCat, setNovoCat] = useState('Outros');
   const [novaDataTransacao, setNovaDataTransacao] = useState(new Date().toISOString().split('T')[0]);
+  
+  // ESTADOS DE AÇÃO
   const [itemParaDeletar, setItemParaDeletar] = useState(null);
+  const [itemEmEdicao, setItemEmEdicao] = useState(null); // Novo estado para edição
 
   const addTransacao = (e) => { 
     e.preventDefault(); 
@@ -723,23 +726,60 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
         return; 
     }
 
-    setTransacoes([...transacoes, { id: Date.now(), 
-      descricao: novaDesc, valor: Number(novoVal), 
-      tipo: novoTipo, 
-      categoria: novaCat, 
-      data: novaDataTransacao }]); 
+    // LÓGICA DE EDIÇÃO (ATUALIZAR)
+    if (itemEmEdicao) {
+      setTransacoes(transacoes.map(t => t.id === itemEmEdicao.id ? {
+        ...t,
+        descricao: novaDesc,
+        valor: Number(novoVal),
+        tipo: novoTipo,
+        categoria: novaCat,
+        data: novaDataTransacao
+      } : t));
+      setItemEmEdicao(null); // Sai do modo edição
+      onNotify("Lançamento atualizado com sucesso!", "success");
+    } 
+    // LÓGICA DE CRIAÇÃO (NOVO)
+    else {
+      setTransacoes([...transacoes, { id: Date.now(), 
+        descricao: novaDesc, valor: Number(novoVal), 
+        tipo: novoTipo, 
+        categoria: novaCat, 
+        data: novaDataTransacao }]); 
+      onNotify("Salvo com sucesso", "success"); 
+    }
     
+    // Limpa o formulário
     setNovaDesc(''); 
     setNovoVal(''); 
     setNovaCat('Outros'); 
+    // Mantém a data atual ou reseta, conforme preferência (mantive a última usada)
+  };
+
+  // FUNÇÃO PARA CARREGAR DADOS NO FORMULÁRIO
+  const prepararEdicao = (transacao) => {
+    setItemEmEdicao(transacao);
+    setNovaDesc(transacao.descricao);
+    setNovoVal(transacao.valor); // InputMoeda aceita number float
+    setNovoTipo(transacao.tipo);
+    setNovaCat(transacao.categoria);
+    setNovaDataTransacao(transacao.data);
     
-    onNotify("Salvo com sucesso", "success"); 
+    // Rola suavemente para o topo para o usuário ver o formulário preenchido
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    
+    onNotify(`Editando: ${transacao.descricao}`, "info");
   };
 
   const confirmarExclusao = () => {
     if (itemParaDeletar) {
       setTransacoes(transacoes.filter(t => t.id !== itemParaDeletar));
       setItemParaDeletar(null);
+      // Se estava editando o item que excluiu, limpa o form
+      if (itemEmEdicao && itemEmEdicao.id === itemParaDeletar) {
+        setItemEmEdicao(null);
+        setNovaDesc(''); setNovoVal('');
+      }
       onNotify("Transação removida com sucesso.", "success");
     }
   };
@@ -760,7 +800,6 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
   if (loading) {
     return (
       <div className="space-y-8 animate-fade-in">
-        {/* Skeletons mantidos iguais... */}
         <div className={`${cardClass} p-6 rounded-2xl border`}>
            <Skeleton className="h-6 w-48 mb-6 rounded-md" />
            <div className="flex flex-col lg:flex-row gap-4 items-end">
@@ -797,13 +836,22 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
   return (
     <div className="space-y-8 animate-fade-in">
       
-      {/* CARD DE NOVO LANÇAMENTO */}
-      <div className={`${cardClass} p-6 rounded-2xl border`}>
-        <h3 className={`font-bold text-xl tracking-tight mb-6 ${textMain}`}>Novo Lançamento</h3>
+      {/* CARD DE FORMULÁRIO (NOVO OU EDIÇÃO) */}
+      <div className={`${cardClass} p-6 rounded-2xl border transition-colors ${itemEmEdicao ? (darkMode ? 'border-blue-500 ring-1 ring-blue-500' : 'border-blue-400 ring-1 ring-blue-400') : ''}`}>
+        <div className="flex justify-between items-center mb-6">
+            <h3 className={`font-bold text-xl tracking-tight ${textMain}`}>
+                {itemEmEdicao ? `Editando Lançamento` : 'Novo Lançamento'}
+            </h3>
+            {itemEmEdicao && (
+                <button onClick={() => { setItemEmEdicao(null); setNovaDesc(''); setNovoVal(''); }} className="text-xs font-bold text-red-500 hover:underline">
+                    Cancelar Edição
+                </button>
+            )}
+        </div>
+        
         <form onSubmit={addTransacao} className="flex flex-col lg:flex-row gap-4 items-end">
           <div className="w-full lg:w-32">
             <label className={`text-xs font-bold uppercase tracking-wider mb-2 block ${textSec}`}>Data</label>
-            {/* MUDANÇA: InputData (Máscara de Data) */}
             <InputData 
                 className={`${inputClass} text-center`} 
                 value={novaDataTransacao} 
@@ -841,7 +889,7 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
           </div>
           
           <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-8 py-3 rounded-xl font-bold w-full lg:w-auto h-[50px] transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40 hover:-translate-y-1 hover:brightness-110 active:scale-95 flex items-center justify-center gap-2 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>
-            <Check size={20} /> Salvar
+            <Check size={20} /> {itemEmEdicao ? "Atualizar" : "Salvar"}
           </button>        
         </form>
       </div>
@@ -877,8 +925,7 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
               </thead>
               <tbody>
                 {transacoesDoMes.sort((a,b) => new Date(b.data) - new Date(a.data)).map((t) => (
-                    <tr key={t.id} className={`border-b transition-colors hover:bg-black/5 ${darkMode ? `${THEME.layout.borderDark} hover:bg-white/5` : `${THEME.layout.border}`}`}>
-                      {/* MUDANÇA: Uso da função formatarData */}
+                    <tr key={t.id} className={`border-b transition-colors hover:bg-black/5 ${darkMode ? `${THEME.layout.borderDark} hover:bg-white/5` : `${THEME.layout.border}`} ${itemEmEdicao?.id === t.id ? (darkMode ? 'bg-blue-900/20' : 'bg-blue-50') : ''}`}>
                       <td className={`p-5 text-sm font-mono opacity-70 ${textMain}`}>{formatarData(t.data)}</td>
                       <td className={`p-5 font-bold text-base ${textMain}`}>{t.descricao}</td>
                       <td className="p-5">
@@ -890,9 +937,17 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
                         {t.tipo === 'saida' ? '- ' : '+ '}{formatarMoeda(t.valor)}
                       </td>
                       <td className="p-5 text-right">
-                        <button onClick={() => setItemParaDeletar(t.id)} className={`p-3 rounded-xl transition-all hover:scale-110 active:scale-95 ${darkMode ? 'hover:bg-rose-900/30 text-gray-500 hover:text-rose-400' : 'hover:bg-rose-50 text-gray-400 hover:text-rose-600'} ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}>
-                          <Trash2 size={18}/>
-                        </button>
+                        <div className="flex justify-end gap-2">
+                            {/* BOTÃO DE EDITAR (LÁPIS) */}
+                            <button onClick={() => prepararEdicao(t)} className={`p-3 rounded-xl transition-all hover:scale-110 active:scale-95 ${darkMode ? 'hover:bg-blue-900/30 text-gray-500 hover:text-blue-400' : 'hover:bg-blue-50 text-gray-400 hover:text-blue-600'} ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`} title="Editar">
+                                <Pencil size={18}/>
+                            </button>
+                            
+                            {/* BOTÃO DE EXCLUIR */}
+                            <button onClick={() => setItemParaDeletar(t.id)} className={`p-3 rounded-xl transition-all hover:scale-110 active:scale-95 ${darkMode ? 'hover:bg-rose-900/30 text-gray-500 hover:text-rose-400' : 'hover:bg-rose-50 text-gray-400 hover:text-rose-600'} ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`} title="Excluir">
+                                <Trash2 size={18}/>
+                            </button>
+                        </div>
                       </td>
                     </tr>
                 ))}
@@ -1359,7 +1414,10 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
   const [novoObjTitulo, setNovoObjTitulo] = useState(''); 
   const [novoObjMeta, setNovoObjMeta] = useState('');
   
+  // ESTADOS DE AÇÃO
   const [objParaDeletar, setObjParaDeletar] = useState(null);
+  const [objEmEdicao, setObjEmEdicao] = useState(null); // Novo estado para edição
+
   const [modalDepositoOpen, setModalDepositoOpen] = useState(false);
   const [depositoAtual, setDepositoAtual] = useState({ id: null, valor: '' });
 
@@ -1368,11 +1426,38 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
   const addObjetivo = (e) => { 
     e.preventDefault(); 
     if(novoObjTitulo) {
-      setObjetivos([...objetivos, {id: Date.now(), titulo: novoObjTitulo, atual: 0, meta: Number(novoObjMeta)}]); 
+      
+      // LÓGICA DE EDIÇÃO
+      if (objEmEdicao) {
+        setObjetivos(objetivos.map(o => o.id === objEmEdicao.id ? {
+            ...o,
+            titulo: novoObjTitulo,
+            meta: Number(novoObjMeta)
+        } : o));
+        setObjEmEdicao(null);
+        onNotify("Meta atualizada com sucesso!", "success");
+      } 
+      // LÓGICA DE CRIAÇÃO
+      else {
+        setObjetivos([...objetivos, {id: Date.now(), titulo: novoObjTitulo, atual: 0, meta: Number(novoObjMeta)}]); 
+        onNotify("Nova meta definida!", "success");
+      }
+
       setNovoObjTitulo(''); setNovoObjMeta('');
-      onNotify("Nova meta definida!", "success");
     } else { onNotify("Defina um nome para a meta.", "warning"); }
   };
+
+  // FUNÇÃO PARA CARREGAR DADOS NO FORMULÁRIO
+  const prepararEdicaoObj = (obj) => {
+    setObjEmEdicao(obj);
+    setNovoObjTitulo(obj.titulo);
+    setNovoObjMeta(obj.meta);
+    
+    // Foca no input e rola para cima
+    if(inputNomeRef.current) inputNomeRef.current.focus();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    onNotify(`Editando meta: ${obj.titulo}`, "info");
+  }
 
   const abrirModalDeposito = (id) => {
       setDepositoAtual({ id, valor: '' });
@@ -1390,6 +1475,10 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
     if(objParaDeletar) {
         setObjetivos(objetivos.filter(o => o.id !== objParaDeletar));
         setObjParaDeletar(null);
+        if(objEmEdicao && objEmEdicao.id === objParaDeletar) {
+            setObjEmEdicao(null);
+            setNovoObjTitulo(''); setNovoObjMeta('');
+        }
         onNotify("Meta excluída.", "success");
     }
   };
@@ -1401,15 +1490,26 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
 
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
-       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
-           <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><Target className={THEME.primary.text}/> Nova Meta</h3>
+       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border transition-colors ${objEmEdicao ? (darkMode ? 'border-blue-500 ring-1 ring-blue-500' : 'border-blue-400 ring-1 ring-blue-400') : ''}`}>
+           <div className="flex justify-between items-center mb-6">
+                <h3 className={`font-bold text-xl tracking-tight flex items-center gap-2 ${textMain}`}>
+                    <Target className={THEME.primary.text}/> {objEmEdicao ? "Editando Meta" : "Nova Meta"}
+                </h3>
+                {objEmEdicao && (
+                    <button onClick={() => { setObjEmEdicao(null); setNovoObjTitulo(''); setNovoObjMeta(''); }} className="text-xs font-bold text-red-500 hover:underline">
+                        Cancelar
+                    </button>
+                )}
+           </div>
+           
            <form onSubmit={addObjetivo} className="flex flex-col md:flex-row gap-4 items-end">
                <div className="flex-1 w-full"><label className={`text-sm font-bold ${textSec}`}>Nome</label><input ref={inputNomeRef} className={inputClass} value={novoObjTitulo} onChange={e => setNovoObjTitulo(e.target.value)} placeholder="Ex: Moto Nova, Viagem, Reserva..."/></div>
                
-               {/* MUDANÇA: InputMoeda na Meta */}
                <div className="w-full md:w-48"><label className={`text-sm font-bold ${textSec}`}>Meta (R$)</label><InputMoeda className={inputClass} value={novoObjMeta} onChange={setNovoObjMeta} /></div>
                
-               <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-6 py-2 rounded-xl font-bold w-full md:w-auto transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:brightness-110 active:scale-95 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Criar</button>
+               <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-6 py-2 rounded-xl font-bold w-full md:w-auto transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:brightness-110 active:scale-95 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>
+                {objEmEdicao ? "Atualizar" : "Criar"}
+               </button>
            </form>
        </div>
        
@@ -1423,11 +1523,22 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
        ) : (
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
              {objetivos.map(obj => (
-                 <div key={obj.id} className={`${cardClass} p-6 rounded-2xl shadow-lg shadow-indigo-500/10 border flex flex-col justify-between h-full`}>
+                 <div key={obj.id} className={`${cardClass} p-6 rounded-2xl shadow-lg shadow-indigo-500/10 border flex flex-col justify-between h-full ${objEmEdicao?.id === obj.id ? (darkMode ? 'bg-indigo-900/10 border-indigo-500/50' : 'bg-indigo-50/50 border-indigo-200') : ''}`}>
                      <div>
                          <div className="flex justify-between items-start mb-4">
                              <div className={`p-3 rounded-xl ${THEME.secondary.light}`}><Trophy size={24} className={THEME.secondary.text} /></div>
-                             <button onClick={() => setObjParaDeletar(obj.id)} className={`${textSec} hover:text-red-500 transition-transform hover:scale-110 rounded-md p-1 flex items-center justify-center ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}><Trash2 size={18}/></button>
+                             
+                             <div className="flex gap-1">
+                                {/* BOTÃO DE EDITAR (LÁPIS) */}
+                                <button onClick={() => prepararEdicaoObj(obj)} className={`${textSec} hover:text-blue-500 transition-transform hover:scale-110 rounded-md p-1 flex items-center justify-center ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`} title="Editar Meta">
+                                    <Pencil size={18}/>
+                                </button>
+                                
+                                {/* BOTÃO DE EXCLUIR */}
+                                <button onClick={() => setObjParaDeletar(obj.id)} className={`${textSec} hover:text-red-500 transition-transform hover:scale-110 rounded-md p-1 flex items-center justify-center ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`} title="Excluir Meta">
+                                    <Trash2 size={18}/>
+                                </button>
+                             </div>
                          </div>
                          <h4 className={`font-bold text-xl mb-1 ${textMain}`}>{obj.titulo}</h4>
                          <p className={`text-sm mb-4 font-medium ${textSec}`}>Meta: {formatarMoeda(obj.meta)}</p>
@@ -1452,7 +1563,6 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
 
       <Modal isOpen={modalDepositoOpen} onClose={() => setModalDepositoOpen(false)} title="Adicionar Valor" darkMode={darkMode}>
           <div className="space-y-4">
-              {/* MUDANÇA: InputMoeda no Depósito */}
               <div><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Valor a depositar</label><InputMoeda className={inputClass} value={depositoAtual.valor} onChange={val => setDepositoAtual({...depositoAtual, valor: val})} autoFocus placeholder="0,00" /></div>
               <button onClick={confirmarDeposito} className={`w-full p-3 rounded-xl font-bold text-white transition-colors ${THEME.primary.bg} ${THEME.primary.bgHover} ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Confirmar</button>
           </div>
