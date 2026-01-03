@@ -431,6 +431,36 @@ const Modal = ({ isOpen, onClose, title, children, darkMode }) => {
   );
 };
 
+const InputMoeda = ({ value, onChange, className, placeholder, autoFocus }) => {
+  const handleChange = (e) => {
+    const apenasNumeros = e.target.value.replace(/\D/g, "");
+
+    if (apenasNumeros === "") {
+      onChange("");
+      return;
+    }
+
+    const valorFloat = Number(apenasNumeros) / 100;
+    onChange(valorFloat);
+  };
+
+  const displayValue = (value === '' || value === undefined)
+    ? '' 
+    : value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      className={className}
+      placeholder={placeholder || "R$ 0,00"}
+      value={displayValue}
+      onChange={handleChange}
+      autoFocus={autoFocus}
+    />
+  );
+};
+
 // ==========================================
 // 3. COMPONENTES DAS ABAS (REFATORADO)
 // ==========================================
@@ -593,7 +623,7 @@ const TabDashboard = ({
 
 const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAtualNome, darkMode, onNotify }) => {
   const [novaDesc, setNovaDesc] = useState(''); 
-  const [novoVal, setNovoVal] = useState(''); 
+  const [novoVal, setNovoVal] = useState('');
   const [novoTipo, setNovoTipo] = useState('saida');
   const [novaCat, setNovaCat] = useState('Outros');
   const [novaDataTransacao, setNovaDataTransacao] = useState(new Date().toISOString().split('T')[0]);
@@ -601,9 +631,22 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
 
   const addTransacao = (e) => { 
     e.preventDefault(); 
-    if (!novaDesc || !novoVal) return; 
-    setTransacoes([...transacoes, { id: Date.now(), descricao: novaDesc, valor: Number(novoVal), tipo: novoTipo, categoria: novaCat, data: novaDataTransacao }]); 
-    setNovaDesc(''); setNovoVal(''); setNovaCat('Outros'); onNotify("Lançamento adicionado com sucesso!", "success"); 
+    if (!novaDesc || !novoVal) {
+        onNotify("Erro ao salvar", "error");
+        return; 
+    }
+
+    setTransacoes([...transacoes, { id: Date.now(), 
+      descricao: novaDesc, valor: Number(novoVal), 
+      tipo: novoTipo, 
+      categoria: novaCat, 
+      data: novaDataTransacao }]); 
+    
+    setNovaDesc(''); 
+    setNovoVal(''); 
+    setNovaCat('Outros'); 
+    
+    onNotify("Salvo com sucesso", "success"); 
   };
 
   const confirmarExclusao = () => {
@@ -627,40 +670,34 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
     : `${THEME.layout.bg} ${THEME.layout.border} ${THEME.layout.text} placeholder-gray-500 focus:bg-white`
   }`;
 
-  // ==========================================
-  // 1. SKELETON LOADING
-  // ==========================================
   if (loading) {
     return (
       <div className="space-y-8 animate-fade-in">
-        {/* Skeleton do Formulário */}
         <div className={`${cardClass} p-6 rounded-2xl border`}>
-           <Skeleton className="h-6 w-48 mb-6 rounded-md" /> {/* Título */}
+           <Skeleton className="h-6 w-48 mb-6 rounded-md" />
            <div className="flex flex-col lg:flex-row gap-4 items-end">
-              <Skeleton className="h-12 w-full lg:w-32 rounded-xl" /> {/* Data */}
-              <Skeleton className="h-12 w-full flex-1 rounded-xl" /> {/* Descrição */}
-              <Skeleton className="h-12 w-full lg:w-48 rounded-xl" /> {/* Categoria */}
-              <Skeleton className="h-12 w-full lg:w-32 rounded-xl" /> {/* Valor */}
-              <Skeleton className="h-12 w-full lg:w-32 rounded-xl" /> {/* Tipo */}
-              <Skeleton className="h-12 w-full lg:w-32 rounded-xl" /> {/* Botão */}
+              <Skeleton className="h-12 w-full lg:w-32 rounded-xl" />
+              <Skeleton className="h-12 w-full flex-1 rounded-xl" />
+              <Skeleton className="h-12 w-full lg:w-48 rounded-xl" />
+              <Skeleton className="h-12 w-full lg:w-32 rounded-xl" />
+              <Skeleton className="h-12 w-full lg:w-32 rounded-xl" />
+              <Skeleton className="h-12 w-full lg:w-32 rounded-xl" />
            </div>
         </div>
-
-        {/* Skeleton da Tabela */}
         <div className={`${cardClass} rounded-2xl border overflow-hidden`}>
            <div className={`p-6 border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
-              <Skeleton className="h-6 w-40 rounded-md" /> {/* Título Lista */}
+              <Skeleton className="h-6 w-40 rounded-md" />
            </div>
            {[1, 2, 3, 4, 5].map((i) => (
              <div key={i} className={`p-5 flex justify-between items-center border-b ${darkMode ? 'border-gray-700' : 'border-gray-100'}`}>
                 <div className="flex gap-4 items-center flex-1">
-                   <Skeleton className="h-4 w-20 rounded-md hidden md:block" /> {/* Data */}
-                   <Skeleton className="h-5 w-40 md:w-64 rounded-md" /> {/* Descrição */}
-                   <Skeleton className="h-6 w-24 rounded-lg hidden md:block" /> {/* Badge Categoria */}
+                   <Skeleton className="h-4 w-20 rounded-md hidden md:block" />
+                   <Skeleton className="h-5 w-40 md:w-64 rounded-md" />
+                   <Skeleton className="h-6 w-24 rounded-lg hidden md:block" />
                 </div>
                 <div className="flex gap-4 items-center">
-                   <Skeleton className="h-5 w-24 rounded-md" /> {/* Valor */}
-                   <Skeleton className="h-10 w-10 rounded-xl" /> {/* Botão Lixeira */}
+                   <Skeleton className="h-5 w-24 rounded-md" />
+                   <Skeleton className="h-10 w-10 rounded-xl" />
                 </div>
              </div>
            ))}
@@ -669,9 +706,6 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
     );
   }
 
-  // ==========================================
-  // 2. RENDERIZAÇÃO NORMAL
-  // ==========================================
   return (
     <div className="space-y-8 animate-fade-in">
       
@@ -698,7 +732,11 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
           
           <div className="w-full lg:w-32">
             <label className={`text-xs font-bold uppercase tracking-wider mb-2 block ${textSec}`}>Valor</label>
-            <input type="number" className={inputClass} placeholder="0.00" value={novoVal} onChange={e => setNovoVal(e.target.value)} />
+            <InputMoeda 
+              className={inputClass} 
+              value={novoVal} 
+              onChange={setNovoVal} 
+            />
           </div>
           
           <div className="w-full lg:w-32">
@@ -721,24 +759,15 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
             <h4 className={`font-bold text-lg capitalize flex items-center gap-2 ${textMain}`}><FileText size={20} className={THEME.primary.text}/> Extrato de {mesAtualNome}</h4>
         </div>
         
-        {/*  EMPTY STATE */}
         {transacoesDoMes.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center animate-fade-in">
              <div className={`p-8 rounded-full mb-6 ${darkMode ? 'bg-gray-800' : 'bg-blue-50'}`}>
                 <FileText size={64} className={`${darkMode ? 'text-gray-600' : 'text-blue-200'}`} />
              </div>
-             
              <h3 className={`text-xl font-bold mb-2 ${textMain}`}>Nenhuma movimentação em {mesAtualNome}</h3>
-             <p className={`max-w-xs mx-auto mb-8 text-sm ${textSec}`}>
-               O seu extrato está limpo. Que tal registrar sua primeira receita ou despesa do mês?
-             </p>
-
-             <button 
-               onClick={() => document.querySelector('input[placeholder="Ex: Supermercado"]').focus()}
-               className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg hover:-translate-y-1 hover:shadow-blue-500/30 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}
-             >
-                <Plus size={20} className="inline mr-2"/>
-                Adicionar primeira transação
+             <p className={`max-w-xs mx-auto mb-8 text-sm ${textSec}`}>O seu extrato está limpo. Que tal registrar sua primeira receita ou despesa do mês?</p>
+             <button onClick={() => document.querySelector('input[placeholder="Ex: Supermercado"]').focus()} className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg hover:-translate-y-1 hover:shadow-blue-500/30 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>
+                <Plus size={20} className="inline mr-2"/> Adicionar primeira transação
              </button>
           </div>
         ) : (
@@ -797,22 +826,17 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
 };
 
 const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
-  // Estados do Formulário Novo Cartão
   const [novoCardNome, setNovoCardNome] = useState(''); 
   const [novoCardLimite, setNovoCardLimite] = useState(''); 
   const [novoCardVenc, setNovoCardVenc] = useState(''); 
   const [novoCardCor, setNovoCardCor] = useState(LISTA_BANCOS[0].cor);
 
-  // Estados para Modais de Ação
   const [cardParaDeletar, setCardParaDeletar] = useState(null);
   const [compraParaDeletar, setCompraParaDeletar] = useState(null);
-  
-  // Estados para Adicionar/Editar Compra (Substitui o prompt)
   const [modalCompraOpen, setModalCompraOpen] = useState(false);
-  const [modoEdicaoCompra, setModoEdicaoCompra] = useState(false); // false = criar, true = editar
+  const [modoEdicaoCompra, setModoEdicaoCompra] = useState(false);
   const [compraAtual, setCompraAtual] = useState({ cardId: null, compraId: null, item: '', valor: '', parcelas: '1' });
 
-  // --- CRUD CARTÃO ---
   const addCartao = (e) => { 
     e.preventDefault(); 
     if (!novoCardNome) { onNotify("Preencha o nome do cartão.", "warning"); return; } 
@@ -829,7 +853,6 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
      }
   };
 
-  // --- CRUD COMPRAS (MODAIS) ---
   const abrirModalNovaCompra = (cardId) => {
       setCompraAtual({ cardId, compraId: null, item: '', valor: '', parcelas: '1' });
       setModoEdicaoCompra(false);
@@ -850,14 +873,12 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
       const valParcela = valTotal / parcelas;
 
       if (modoEdicaoCompra) {
-          // Editar
           setCartoes(cartoes.map(c => c.id === compraAtual.cardId ? { 
               ...c, 
               compras: c.compras.map(comp => comp.id === compraAtual.compraId ? { ...comp, item: compraAtual.item, valorTotal: valTotal, parcelas, valorParcela: valParcela } : comp) 
           } : c));
           onNotify("Compra atualizada!", "success");
       } else {
-          // Criar
           setCartoes(cartoes.map(c => c.id === compraAtual.cardId ? { 
               ...c, 
               compras: [...(c.compras || []), { id: Date.now(), item: compraAtual.item, valorTotal: valTotal, valorParcela: valParcela, parcelas, atual: 1 }] 
@@ -882,14 +903,16 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
 
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
-      {/* Formulário Novo Cartão (Código Igual) */}
       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
         <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><CreditCard className={THEME.primary.text}/> Novo Cartão</h3>
         <form onSubmit={addCartao} className="space-y-4">
             <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Nome</label><input className={inputClass} value={novoCardNome} onChange={e => setNovoCardNome(e.target.value)} /></div>
-                <div className="w-32"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Limite Total</label><input type="number" className={inputClass} value={novoCardLimite} onChange={e => setNovoCardLimite(e.target.value)} /></div>
-                <div className="w-32"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Dia Venc.</label><input type="number" className={inputClass} value={novoCardVenc} onChange={e => setNovoCardVenc(e.target.value)} /></div>
+                
+                {/* MUDANÇA: InputMoeda no Limite */}
+                <div className="w-full md:w-32"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Limite Total</label><InputMoeda className={inputClass} value={novoCardLimite} onChange={setNovoCardLimite} /></div>
+                
+                <div className="w-full md:w-32"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Dia Venc.</label><input type="number" className={inputClass} value={novoCardVenc} onChange={e => setNovoCardVenc(e.target.value)} /></div>
             </div>
             <div>
                 <label className={`text-xs font-bold uppercase tracking-wider mb-2 block ${textSec}`}>Cor do Banco</label>
@@ -928,7 +951,6 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
                             <h4 className={`font-bold text-sm ${textMain}`}>Compras Parceladas</h4>
                             <button onClick={() => abrirModalNovaCompra(card.id)} className={`text-xs px-3 py-1 rounded-full flex items-center gap-1 font-bold ${darkMode ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL}`}><Plus size={12}/> Nova Compra</button>
                         </div>
-                        {/* CORREÇÃO CSS: overflow-x-hidden e padding para evitar scrollbar horizontal */}
                         <div className="space-y-2 max-h-40 overflow-y-auto overflow-x-hidden pr-2">
                             {listaCompras.map(c => (
                                 <div key={c.id} className={`flex justify-between items-center text-sm border-b pb-2 last:border-0 ${darkMode ? THEME.layout.borderDark : THEME.layout.border}`}>
@@ -947,7 +969,6 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
         })}
       </div>
 
-      {/* MODAL DE CONFIRMAÇÃO EXCLUSÃO */}
       <Modal isOpen={!!cardParaDeletar} onClose={() => setCardParaDeletar(null)} title="Excluir Cartão?" darkMode={darkMode}>
         <div className="text-center space-y-4">
             <p className={textMain}>Você perderá todo o histórico deste cartão.</p>
@@ -968,18 +989,17 @@ const TabCarteira = ({ cartoes, setCartoes, darkMode, onNotify }) => {
         </div>
       </Modal>
 
-      {/* MODAL PARA NOVA/EDITAR COMPRA (SUBSTITUI O PROMPT) */}
       <Modal isOpen={modalCompraOpen} onClose={() => setModalCompraOpen(false)} title={modoEdicaoCompra ? "Editar Compra" : "Nova Compra"} darkMode={darkMode}>
           <div className="space-y-4">
               <div><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Descrição</label><input className={inputClass} value={compraAtual.item} onChange={e => setCompraAtual({...compraAtual, item: e.target.value})} placeholder="Ex: Notebook" autoFocus /></div>
               <div className="flex gap-4">
-                  <div className="flex-1"><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Valor Total</label><input type="number" className={inputClass} value={compraAtual.valor} onChange={e => setCompraAtual({...compraAtual, valor: e.target.value})} placeholder="0.00" /></div>
+                  {/* MUDANÇA: InputMoeda no Valor */}
+                  <div className="flex-1"><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Valor Total</label><InputMoeda className={inputClass} value={compraAtual.valor} onChange={val => setCompraAtual({...compraAtual, valor: val})} placeholder="0,00" /></div>
                   <div className="w-24"><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Parcelas</label><input type="number" className={inputClass} value={compraAtual.parcelas} onChange={e => setCompraAtual({...compraAtual, parcelas: e.target.value})} placeholder="1" /></div>
               </div>
               <button onClick={salvarCompra} className={`w-full p-3 rounded-xl font-bold text-white transition-colors ${THEME.primary.bg} ${THEME.primary.bgHover} ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Salvar</button>
           </div>
       </Modal>
-
     </div>
   );
 };
@@ -1245,7 +1265,6 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
   const [novoObjTitulo, setNovoObjTitulo] = useState(''); 
   const [novoObjMeta, setNovoObjMeta] = useState('');
   
-  // Estados para Modais
   const [objParaDeletar, setObjParaDeletar] = useState(null);
   const [modalDepositoOpen, setModalDepositoOpen] = useState(false);
   const [depositoAtual, setDepositoAtual] = useState({ id: null, valor: '' });
@@ -1261,7 +1280,6 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
     } else { onNotify("Defina um nome para a meta.", "warning"); }
   };
 
-  // Abre Modal em vez de Prompt
   const abrirModalDeposito = (id) => {
       setDepositoAtual({ id, valor: '' });
       setModalDepositoOpen(true);
@@ -1289,12 +1307,14 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
 
   return (
     <div className="space-y-6 pb-20 animate-fade-in">
-       {/* Card Nova Meta (Mantém igual) */}
        <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
            <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><Target className={THEME.primary.text}/> Nova Meta</h3>
            <form onSubmit={addObjetivo} className="flex flex-col md:flex-row gap-4 items-end">
                <div className="flex-1 w-full"><label className={`text-sm font-bold ${textSec}`}>Nome</label><input ref={inputNomeRef} className={inputClass} value={novoObjTitulo} onChange={e => setNovoObjTitulo(e.target.value)} placeholder="Ex: Moto Nova, Viagem, Reserva..."/></div>
-               <div className="w-48"><label className={`text-sm font-bold ${textSec}`}>Meta (R$)</label><input type="number" className={inputClass} value={novoObjMeta} onChange={e => setNovoObjMeta(e.target.value)} /></div>
+               
+               {/* MUDANÇA: InputMoeda na Meta */}
+               <div className="w-full md:w-48"><label className={`text-sm font-bold ${textSec}`}>Meta (R$)</label><InputMoeda className={inputClass} value={novoObjMeta} onChange={setNovoObjMeta} /></div>
+               
                <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-6 py-2 rounded-xl font-bold w-full md:w-auto transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:brightness-110 active:scale-95 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Criar</button>
            </form>
        </div>
@@ -1336,10 +1356,10 @@ const TabObjetivos = ({ objetivos, setObjetivos, darkMode, onNotify}) => {
         </div>
       </Modal>
 
-      {/* MODAL ADICIONAR VALOR */}
       <Modal isOpen={modalDepositoOpen} onClose={() => setModalDepositoOpen(false)} title="Adicionar Valor" darkMode={darkMode}>
           <div className="space-y-4">
-              <div><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Valor a depositar</label><input type="number" className={inputClass} value={depositoAtual.valor} onChange={e => setDepositoAtual({...depositoAtual, valor: e.target.value})} autoFocus placeholder="0.00" /></div>
+              {/* MUDANÇA: InputMoeda no Depósito */}
+              <div><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Valor a depositar</label><InputMoeda className={inputClass} value={depositoAtual.valor} onChange={val => setDepositoAtual({...depositoAtual, valor: val})} autoFocus placeholder="0,00" /></div>
               <button onClick={confirmarDeposito} className={`w-full p-3 rounded-xl font-bold text-white transition-colors ${THEME.primary.bg} ${THEME.primary.bgHover} ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Confirmar</button>
           </div>
       </Modal>
@@ -1354,8 +1374,6 @@ const TabBancos = ({ loading, bancos, setBancos, darkMode, onNotify }) => {
   const [bancoEmEdicao, setBancoEmEdicao] = useState(null);
   const [novoSaldoEdit, setNovoSaldoEdit] = useState('');
   const [mostrandoForm, setMostrandoForm] = useState(false);
-  
-  // ESTADO PARA DELEÇÃO
   const [bancoParaDeletar, setBancoParaDeletar] = useState(null);
 
   const addBanco = (e) => { 
@@ -1365,7 +1383,6 @@ const TabBancos = ({ loading, bancos, setBancos, darkMode, onNotify }) => {
       onNotify("Conta bancária adicionada!", "success");
   }
   
-  // Função que deleta de verdade
   const confirmarExclusao = () => {
     if(bancoParaDeletar) {
         setBancos(bancos.filter(b => b.id !== bancoParaDeletar));
@@ -1390,10 +1407,9 @@ const TabBancos = ({ loading, bancos, setBancos, darkMode, onNotify }) => {
   const textSec = darkMode ? THEME.layout.textSecDark : THEME.layout.textSec;
   const inputClass = `w-full p-3 border rounded-xl transition-all ${darkMode ? FOCUS_DARK_AZUL : FOCUS_LIGHT_AZUL} ${darkMode ? `${THEME.layout.bgDark} ${THEME.layout.borderDark} ${THEME.layout.textDark} placeholder-gray-500` : `${THEME.layout.bg} ${THEME.layout.border} ${THEME.layout.text} placeholder-gray-500 focus:bg-white`}`;
 
-  if (loading) { /* ... Skeleton igual ... */ return <div className="space-y-6 animate-fade-in"><Skeleton className="h-20 w-full rounded-2xl"/><Skeleton className="h-40 w-full rounded-2xl"/><Skeleton className="h-60 w-full rounded-2xl"/></div>; }
+  if (loading) { return <div className="space-y-6 animate-fade-in"><Skeleton className="h-20 w-full rounded-2xl"/><Skeleton className="h-40 w-full rounded-2xl"/><Skeleton className="h-60 w-full rounded-2xl"/></div>; }
 
   if (bancos.length === 0 && !mostrandoForm) {
-    /* ... Empty State igual ... */
     return (
       <div className="flex flex-col items-center justify-center py-12 md:py-20 animate-fade-in h-full">
          <div className={`p-8 rounded-full mb-6 ${darkMode ? 'bg-gray-800' : 'bg-blue-50'} shadow-xl shadow-blue-500/10`}><Landmark size={80} strokeWidth={1.5} className={`${darkMode ? 'text-gray-600' : 'text-blue-200'}`} /></div>
@@ -1407,20 +1423,21 @@ const TabBancos = ({ loading, bancos, setBancos, darkMode, onNotify }) => {
     <div className="space-y-6 pb-20 animate-fade-in">
       {bancos.length > 0 && (<div className={`${cardClass} p-6 rounded-2xl shadow-sm border flex items-center justify-between animate-fade-in`}><div><p className={`text-xs font-bold uppercase tracking-wider mb-1 ${textSec}`}>Patrimônio em Bancos</p><h2 className={`text-4xl font-bold ${textMain}`}>{formatarMoeda(totalBancos)}</h2></div><div className={`p-4 rounded-xl ${THEME.success.light}`}><Landmark size={32} className={THEME.success.text} /></div></div>)}
 
-      {/* Form Cadastro (Resumido para não ocupar espaço, código igual) */}
       <div className={`${cardClass} p-6 rounded-2xl shadow-sm border`}>
           <h3 className={`font-bold text-xl tracking-tight mb-6 flex items-center gap-2 ${textMain}`}><Building2 className={THEME.primary.text} /> Cadastrar Conta</h3>
           <form onSubmit={addBanco} className="space-y-4">
               <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Escolha o Banco</label><select className={inputClass} onChange={(e) => { const banco = LISTA_BANCOS.find(b => b.nome === e.target.value); setBancoSelecionado(banco); }} value={bancoSelecionado.nome}>{LISTA_BANCOS.map(b => <option key={b.nome} value={b.nome}>{b.nome}</option>)}</select></div>
-                  <div className="w-full md:w-40"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Saldo Atual</label><input type="number" className={inputClass} placeholder="0.00" value={novoBancoSaldo} onChange={e => setNovoBancoSaldo(e.target.value)} /></div>
+                  
+                  {/* MUDANÇA: InputMoeda no Saldo Inicial */}
+                  <div className="w-full md:w-40"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Saldo Atual</label><InputMoeda className={inputClass} placeholder="0,00" value={novoBancoSaldo} onChange={setNovoBancoSaldo} /></div>
+                  
                   <div className="w-full md:w-40"><label className={`text-xs font-bold uppercase tracking-wider mb-1 block ${textSec}`}>Tipo</label><select className={inputClass} value={novoBancoTipo} onChange={e => setNovoBancoTipo(e.target.value)}><option value="Corrente">Corrente</option><option value="Poupança">Poupança</option><option value="Investimento">Investimento</option></select></div>
               </div>
               <button className={`${THEME.primary.bg} ${THEME.primary.bgHover} text-white px-6 p-3 rounded-xl font-bold w-full transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:brightness-110 active:scale-95 ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Salvar Conta</button>
           </form>
       </div>
 
-      {/* Lista */}
       {bancos.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
             {bancos.map(banco => (
@@ -1428,7 +1445,6 @@ const TabBancos = ({ loading, bancos, setBancos, darkMode, onNotify }) => {
                     <div className={`h-28 bg-gradient-to-r ${banco.cor} p-4 relative overflow-hidden flex flex-col justify-between`}>
                         <div className="flex justify-between items-start z-10 relative">
                             <Landmark size={32} className="text-white opacity-80" />
-                            {/* BOTÃO DELETE ATUALIZADO */}
                             <button onClick={() => setBancoParaDeletar(banco.id)} className={`text-white opacity-60 hover:opacity-100 transition-transform hover:scale-110 rounded-md flex items-center justify-center p-1 ${darkMode ? FOCUS_DARK_VERMELHO : FOCUS_LIGHT_VERMELHO}`}><Trash2 size={18}/></button>
                         </div>
                         <span className="text-white font-bold text-xl tracking-tight relative z-10">{banco.nome}</span>
@@ -1443,16 +1459,15 @@ const TabBancos = ({ loading, bancos, setBancos, darkMode, onNotify }) => {
         </div>
       )}
 
-      {/* Modal de Edição (Já existia) */}
       <Modal isOpen={!!bancoEmEdicao} onClose={() => setBancoEmEdicao(null)} title="Atualizar Saldo" darkMode={darkMode}>
           <div className="space-y-4">
              <p className={`text-sm ${textSec}`}>Atualize o saldo atual da conta <strong>{bancoEmEdicao?.nome}</strong>.</p>
-             <div><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Novo Valor</label><input type="number" className={inputClass} value={novoSaldoEdit} onChange={e => setNovoSaldoEdit(e.target.value)} autoFocus /></div>
+             {/* MUDANÇA: InputMoeda na Edição */}
+             <div><label className={`text-xs font-bold uppercase mb-1 block ${textSec}`}>Novo Valor</label><InputMoeda className={inputClass} value={novoSaldoEdit} onChange={setNovoSaldoEdit} autoFocus /></div>
              <button onClick={salvarEdicao} className={`w-full p-3 rounded-xl font-bold text-white transition-colors ${THEME.primary.bg} ${THEME.primary.bgHover} ${darkMode ? FOCUS_DARK_BRANCO : FOCUS_LIGHT_AZUL}`}>Confirmar Alteração</button>
           </div>
       </Modal>
 
-      {/* NOVO MODAL DE EXCLUSÃO */}
       <Modal isOpen={!!bancoParaDeletar} onClose={() => setBancoParaDeletar(null)} title="Excluir Conta?" darkMode={darkMode}>
         <div className="text-center space-y-4">
             <p className={textMain}>O histórico financeiro desta conta será perdido.</p>
