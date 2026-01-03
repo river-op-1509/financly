@@ -8,7 +8,7 @@ import {
   Pencil, ArrowDownRight, Trophy, Building2, User, Award, 
   // Ícones de Configuração e Gráficos
   Star, Medal, Shield, Zap, Briefcase, Crown, Download, Upload, AlertTriangle, LogOut,
-  Moon, Sun, Type, Minus, PlusCircle, PieChart, BarChart3, LineChart
+  Moon, Sun, Type, Minus, PlusCircle, PieChart, BarChart3, LineChart, Ghost, Home
 } from 'lucide-react';
 
 // ==========================================
@@ -521,6 +521,32 @@ const InputData = ({ value, onChange, className }) => {
     />
   );
 };
+
+const NotFoundPage = ({ onVoltar, darkMode }) => (
+  <div className={`min-h-screen flex flex-col items-center justify-center p-4 transition-colors ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
+    <div className="text-center space-y-6 max-w-md animate-bounce-in">
+      <div className={`w-32 h-32 mx-auto rounded-full flex items-center justify-center ${darkMode ? 'bg-gray-800' : 'bg-blue-100'}`}>
+        <Ghost size={64} className={darkMode ? 'text-gray-400' : 'text-blue-500'} />
+      </div>
+      
+      <h1 className="text-6xl font-black tracking-tighter opacity-20">404</h1>
+      
+      <div className="space-y-2">
+        <h2 className="text-2xl font-bold">Página não encontrada</h2>
+        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          Parece que você se perdeu no caminho. A página que você tentou acessar não existe ou foi movida.
+        </p>
+      </div>
+
+      <button 
+        onClick={onVoltar}
+        className={`flex items-center justify-center gap-2 px-8 py-3 rounded-xl font-bold transition-all hover:-translate-y-1 hover:shadow-lg w-full ${darkMode ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+      >
+        <Home size={20} /> Voltar para o Início
+      </button>
+    </div>
+  </div>
+);
 
 // ==========================================
 // 3. COMPONENTES DAS ABAS (REFATORADO)
@@ -1626,10 +1652,35 @@ const TabConfiguracoes = ({ darkMode, setDarkMode, zoomLevel, setZoomLevel, usua
 // ==========================================
 
 const FinanceDashboard = () => {
+  // Estado para controlar a 404
+  const [paginaNaoEncontrada, setPaginaNaoEncontrada] = useState(false);
+
+  // --- LÓGICA DE ROTA 404 ---
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path !== '/' && path !== '' && path !== '/index.html') {
+      setPaginaNaoEncontrada(true);
+      setLoading(false); 
+    }
+  }, []);
+
+  // Função para voltar para a home
+  const voltarParaHome = () => {
+    window.history.pushState({}, '', '/'); 
+    setPaginaNaoEncontrada(false);
+    setActiveTab('Dashboard');
+  };
+
+  // SE FOR 404, RETORNA A TELA DE ERRO IMEDIATAMENTE
+  if (paginaNaoEncontrada) {
+    return <NotFoundPage onVoltar={voltarParaHome} darkMode={darkMode} />;
+  }
+
+  // Estados Globais
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [dataAtual, setDataAtual] = useState(new Date());
   
-  // --- ESTADO DE LOADING ---
+  // Estadode carregamento
   const [loading, setLoading] = useState(true);
   
   // Helpers de Data
