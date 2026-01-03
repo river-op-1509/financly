@@ -77,7 +77,14 @@ const lerDados = (chave, padrao) => {
   catch (e) { return padrao; }
 };
 
-const formatarMoeda = (val) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const formatarMoeda = (val) =>
+  val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const formatarData = (dataISO) => {
+  if (!dataISO) return '';
+  const [ano, mes, dia] = dataISO.split('-');
+  return `${dia}/${mes}/${ano}`;
+};
 
 // PALETA DE CORES
 
@@ -461,6 +468,60 @@ const InputMoeda = ({ value, onChange, className, placeholder, autoFocus }) => {
   );
 };
 
+const InputData = ({ value, onChange, className }) => {
+  // Converte YYYY-MM-DD (estado) para DD/MM/AAAA (visual)
+  const formatarParaVisual = (val) => {
+    if (!val) return '';
+    const [ano, mes, dia] = val.split('-');
+    return `${dia}/${mes}/${ano}`;
+  };
+
+  const [display, setDisplay] = useState(formatarParaVisual(value));
+
+  // Sincroniza se o valor externo mudar (ex: resetar formulário)
+  useEffect(() => {
+    setDisplay(formatarParaVisual(value));
+  }, [value]);
+
+  const handleChange = (e) => {
+    let v = e.target.value.replace(/\D/g, ''); // Remove tudo que não é dígito
+
+    if (v.length > 8) v = v.slice(0, 8); // Limita a 8 números
+
+    // Aplica a máscara DD/MM/AAAA
+    let masked = v;
+    if (v.length > 2) masked = `${v.slice(0, 2)}/${v.slice(2)}`;
+    if (v.length > 4) masked = `${masked.slice(0, 5)}/${v.slice(4)}`;
+
+    setDisplay(masked);
+
+    // Se a data estiver completa (8 dígitos), atualiza o estado pai no formato ISO
+    if (v.length === 8) {
+      const dia = v.slice(0, 2);
+      const mes = v.slice(2, 4);
+      const ano = v.slice(4, 8);
+      // Validação básica de data
+      if(Number(mes) > 0 && Number(mes) <= 12 && Number(dia) > 0 && Number(dia) <= 31) {
+         onChange(`${ano}-${mes}-${dia}`); 
+      }
+    } else if (v.length === 0) {
+      onChange('');
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      placeholder="DD/MM/AAAA"
+      className={className}
+      value={display}
+      onChange={handleChange}
+      maxLength={10}
+    />
+  );
+};
+
 // ==========================================
 // 3. COMPONENTES DAS ABAS (REFATORADO)
 // ==========================================
@@ -623,7 +684,7 @@ const TabDashboard = ({
 
 const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAtualNome, darkMode, onNotify }) => {
   const [novaDesc, setNovaDesc] = useState(''); 
-  const [novoVal, setNovoVal] = useState('');
+  const [novoVal, setNovoVal] = useState(''); 
   const [novoTipo, setNovoTipo] = useState('saida');
   const [novaCat, setNovaCat] = useState('Outros');
   const [novaDataTransacao, setNovaDataTransacao] = useState(new Date().toISOString().split('T')[0]);
@@ -673,6 +734,7 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
   if (loading) {
     return (
       <div className="space-y-8 animate-fade-in">
+        {/* Skeletons mantidos iguais... */}
         <div className={`${cardClass} p-6 rounded-2xl border`}>
            <Skeleton className="h-6 w-48 mb-6 rounded-md" />
            <div className="flex flex-col lg:flex-row gap-4 items-end">
@@ -715,7 +777,12 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
         <form onSubmit={addTransacao} className="flex flex-col lg:flex-row gap-4 items-end">
           <div className="w-full lg:w-32">
             <label className={`text-xs font-bold uppercase tracking-wider mb-2 block ${textSec}`}>Data</label>
-            <input type="date" className={inputClass} value={novaDataTransacao} onChange={e => setNovaDataTransacao(e.target.value)} />
+            {/* MUDANÇA: InputData (Máscara de Data) */}
+            <InputData 
+                className={`${inputClass} text-center`} 
+                value={novaDataTransacao} 
+                onChange={setNovaDataTransacao} 
+            />
           </div>
           
           <div className="flex-1 w-full">
@@ -785,7 +852,8 @@ const TabExtrato = ({ loading, transacoes, setTransacoes, transacoesDoMes, mesAt
               <tbody>
                 {transacoesDoMes.sort((a,b) => new Date(b.data) - new Date(a.data)).map((t) => (
                     <tr key={t.id} className={`border-b transition-colors hover:bg-black/5 ${darkMode ? `${THEME.layout.borderDark} hover:bg-white/5` : `${THEME.layout.border}`}`}>
-                      <td className={`p-5 text-sm font-mono opacity-70 ${textMain}`}>{t.data.split('-').reverse().join('/')}</td>
+                      {/* MUDANÇA: Uso da função formatarData */}
+                      <td className={`p-5 text-sm font-mono opacity-70 ${textMain}`}>{formatarData(t.data)}</td>
                       <td className={`p-5 font-bold text-base ${textMain}`}>{t.descricao}</td>
                       <td className="p-5">
                         <span className={`text-xs px-3 py-1.5 rounded-lg font-bold border ${darkMode ? `${THEME.layout.cardDark} ${THEME.layout.borderDark} ${THEME.layout.textSecDark}` : `${THEME.layout.card} ${THEME.layout.border} ${THEME.layout.textSec}`}`}>
