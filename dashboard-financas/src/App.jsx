@@ -1762,7 +1762,7 @@ const TabConfiguracoes = ({ darkMode, setDarkMode, zoomLevel, setZoomLevel, usua
 // ==========================================
 
 const FinanceDashboard = () => {
-  // 1. LÓGICA DE ROTA 404 (Executa antes de renderizar qualquer coisa)
+  // 1. LÓGICA DE ROTA 404
   const [paginaNaoEncontrada, setPaginaNaoEncontrada] = useState(() => {
     // Verifica a URL instantaneamente na inicialização
     const path = window.location.pathname;
@@ -1811,7 +1811,12 @@ const FinanceDashboard = () => {
   const pertenceAoMesAtual = (dataString) => { const [a, m] = dataString.split('-'); return Number(a) === anoAtual && Number(m) === (dataAtual.getMonth() + 1); };
 
   // --- EFEITOS (UseEffects) ---
-  
+
+  // ATUALIZAÇÃO DO TÍTULO DA PÁGINA
+  useEffect(() => {
+    document.title = `${activeTab} | Financly`;
+  }, [activeTab]);
+
   // Simulação de Loading
   useEffect(() => {
     const timer = setTimeout(() => {
