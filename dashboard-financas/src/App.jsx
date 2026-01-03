@@ -1652,18 +1652,17 @@ const TabConfiguracoes = ({ darkMode, setDarkMode, zoomLevel, setZoomLevel, usua
 // ==========================================
 
 const FinanceDashboard = () => {
-  // Estado para controlar a 404
-  const [paginaNaoEncontrada, setPaginaNaoEncontrada] = useState(false);
-
-  // --- LÓGICA DE ROTA 404 ---
-  useEffect(() => {
+  // 1. LÓGICA DE ROTA 404 (Executa antes de renderizar qualquer coisa)
+  const [paginaNaoEncontrada, setPaginaNaoEncontrada] = useState(() => {
+    // Verifica a URL instantaneamente na inicialização
     const path = window.location.pathname;
-    if (path !== '/' && path !== '' && path !== '/index.html') {
-      setPaginaNaoEncontrada(true);
-      setLoading(false); 
-    }
-  }, []);
+    return path !== '/' && path !== '' && path !== '/index.html';
+  });
 
+  // 2. ESTADOS GLOBAIS
+  // Declaramos aqui para garantir que o darkMode exista se cair na 404
+  const [darkMode, setDarkMode] = useState(() => lerDados('fin_v20_dark', false));
+  
   // Função para voltar para a home
   const voltarParaHome = () => {
     window.history.pushState({}, '', '/'); 
@@ -1671,32 +1670,21 @@ const FinanceDashboard = () => {
     setActiveTab('Dashboard');
   };
 
-  // SE FOR 404, RETORNA A TELA DE ERRO IMEDIATAMENTE
+  // --- EARLY RETURN: SE FOR 404, PARE AQUI E MOSTRE O ERRO ---
   if (paginaNaoEncontrada) {
     return <NotFoundPage onVoltar={voltarParaHome} darkMode={darkMode} />;
   }
 
-  // Estados Globais
+  // --- ESTADOS DO APP (Só carregam se estiver na Home) ---
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [dataAtual, setDataAtual] = useState(new Date());
-  
-  // Estadode carregamento
   const [loading, setLoading] = useState(true);
   
-  // Helpers de Data
-  const mudarAno = (offset) => { const d = new Date(dataAtual); d.setFullYear(dataAtual.getFullYear() + offset); setDataAtual(d); };
-  const mudarMes = (offset) => { const d = new Date(dataAtual); d.setMonth(dataAtual.getMonth() + offset); setDataAtual(d); };
-  const anoAtual = dataAtual.getFullYear();
-  const mesAtualNome = dataAtual.toLocaleString('pt-BR', { month: 'long' });
-  const pertenceAoMesAtual = (dataString) => { const [a, m] = dataString.split('-'); return Number(a) === anoAtual && Number(m) === (dataAtual.getMonth() + 1); };
-  
-  // Estados e Refs
   const fileInputRef = useRef(null);
   const [notificacao, setNotificacao] = useState(null);
   const [modalPerfilOpen, setModalPerfilOpen] = useState(false);
 
-  // DADOS GLOBAIS (Persistência)
-  const [darkMode, setDarkMode] = useState(() => lerDados('fin_v20_dark', false));
+  // DADOS DE NEGÓCIO (Persistência)
   const [zoomLevel, setZoomLevel] = useState(() => lerDados('fin_v20_zoom', 1));
   const [transacoes, setTransacoes] = useState(() => lerDados('fin_v20_transacoes', []));
   const [objetivos, setObjetivos] = useState(() => lerDados('fin_v20_objetivos', []));
@@ -1705,17 +1693,24 @@ const FinanceDashboard = () => {
   const [usuario, setUsuario] = useState(() => lerDados('fin_v20_usuario', { nome: 'Operador' }));
   const [conquistasDesbloqueadas, setConquistasDesbloqueadas] = useState(() => lerDados('fin_v20_conquistas', []));
 
-  // --- SIMULAÇÃO DE CARREGAMENTO ---
+  // --- HELPERS DE DATA ---
+  const mudarAno = (offset) => { const d = new Date(dataAtual); d.setFullYear(dataAtual.getFullYear() + offset); setDataAtual(d); };
+  const mudarMes = (offset) => { const d = new Date(dataAtual); d.setMonth(dataAtual.getMonth() + offset); setDataAtual(d); };
+  const anoAtual = dataAtual.getFullYear();
+  const mesAtualNome = dataAtual.toLocaleString('pt-BR', { month: 'long' });
+  const pertenceAoMesAtual = (dataString) => { const [a, m] = dataString.split('-'); return Number(a) === anoAtual && Number(m) === (dataAtual.getMonth() + 1); };
+
+  // --- EFEITOS (UseEffects) ---
+  
+  // Simulação de Loading
   useEffect(() => {
-    // Delay de 1.5 segundos
     const timer = setTimeout(() => {
       setLoading(false);
     }, 1500);
-
     return () => clearTimeout(timer);
   }, []);
 
-  // Efeitos (Persistência)
+  // Persistência no LocalStorage
   useEffect(() => {
     localStorage.setItem('fin_v20_transacoes', JSON.stringify(transacoes));
     localStorage.setItem('fin_v20_objetivos', JSON.stringify(objetivos));
@@ -1752,7 +1747,7 @@ const FinanceDashboard = () => {
     if (novasConquistas.length > conquistasDesbloqueadas.length) setConquistasDesbloqueadas(novasConquistas);
   }, [transacoes, objetivos, bancos, cartoes, conquistasDesbloqueadas]); 
 
-  // Cálculos Memoized (BLINDADOS)
+  // --- CÁLCULOS MEMOIZED (BLINDADOS) ---
   const transacoesDoMes = useMemo(() => transacoes.filter(t => pertenceAoMesAtual(t.data)), [transacoes, dataAtual]);
   const receitas = useMemo(() => transacoesDoMes.filter(t => t.tipo === 'entrada').reduce((acc, c) => acc + c.valor, 0), [transacoesDoMes]);
   const despesas = useMemo(() => transacoesDoMes.filter(t => t.tipo === 'saida').reduce((acc, c) => acc + c.valor, 0), [transacoesDoMes]);
@@ -1761,7 +1756,7 @@ const FinanceDashboard = () => {
   // Proteção contra crash se compras for undefined
   const totalFaturas = cartoes.reduce((acc, c) => acc + (c.compras || []).reduce((sub, item) => sub + item.valorParcela, 0), 0);
 
-  // Funções de Sistema (Export/Import/Reset)
+  // --- FUNÇÕES DE SISTEMA (Export/Import/Reset) ---
   const exportarDados = () => {
     try {
       const dados = { transacoes, objetivos, cartoes, bancos, usuario, conquistasDesbloqueadas };
@@ -1771,8 +1766,6 @@ const FinanceDashboard = () => {
       a.href = url; 
       a.download = `backup_financeiro_${new Date().toISOString().split('T')[0]}.json`; 
       a.click();
-      
-      // Feedback visual (Toast)
       dispararNotificacao("Backup salvo na pasta de downloads!", "success");
     } catch (error) {
       dispararNotificacao("Erro ao gerar arquivo de backup.", "error");
@@ -1809,6 +1802,7 @@ const FinanceDashboard = () => {
       dispararNotificacao("Sistema reiniciado para padrões de fábrica.", "warning");
   };
 
+  // --- RENDERIZAÇÃO DO DASHBOARD ---
   return (
     <div className={`flex h-screen font-sans transition-colors duration-300 ${darkMode ? `${THEME.layout.bgDark} ${THEME.layout.textDark}` : `${THEME.layout.bg} ${THEME.layout.text}`}`} style={{ zoom: zoomLevel }}>
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} darkMode={darkMode} />
@@ -1827,7 +1821,6 @@ const FinanceDashboard = () => {
             darkMode={darkMode} 
           />
           
-          {/* --- PASSANDO A PROP LOADING --- */}
           {activeTab === 'Dashboard' && (
             <TabDashboard 
               loading={loading}
@@ -1843,7 +1836,6 @@ const FinanceDashboard = () => {
             />
           )}
 
-          {/* loading preparado para implementar skeletons */}
           {activeTab === 'Extrato' && <TabExtrato loading={loading} transacoes={transacoes} setTransacoes={setTransacoes} transacoesDoMes={transacoesDoMes} mesAtualNome={mesAtualNome} darkMode={darkMode} onNotify={dispararNotificacao} />}
           {activeTab === 'Gráficos' && <TabGraficos loading={loading} transacoesDoMes={transacoesDoMes} receitas={receitas} despesas={despesas} saldo={saldo} darkMode={darkMode} setActiveTab={setActiveTab} />}
           {activeTab === 'Carteira' && <TabCarteira loading={loading} cartoes={cartoes} setCartoes={setCartoes} darkMode={darkMode} onNotify={dispararNotificacao} />}
