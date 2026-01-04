@@ -15,7 +15,7 @@ A aplicação segue rigorosos padrões de hierarquia visual, feedback de interfa
 ## Interface
 
 <div align="center">
-  <img src="assets/print-desktop.png" alt="Dashboard Financly" width="100%">
+  <img src="dashboard-financas/public/cover-image.png" alt="Dashboard Financly" width="100%">
 </div>
 
 ## Tecnologias
